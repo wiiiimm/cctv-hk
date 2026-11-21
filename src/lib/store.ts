@@ -27,6 +27,7 @@ export interface State {
   /** Hide the guide and info panel so the wall uses the full width. */
   theater: boolean;
   cells: string[];
+  /** Selected cell, or -1 when nothing is selected (click empty wall / Esc). */
   selected: number;
   focused: boolean;
   groupId: string;
@@ -190,6 +191,9 @@ const clampPreview = (px: number) => Math.max(PREVIEW_MIN, Math.min(PREVIEW_MAX,
 let wallCapacity = 0;
 const capacityOr = (fallback: number) => (wallCapacity > 0 ? wallCapacity : fallback);
 
+/** The cell an action applies to: the selection, else the pinned video, else the first tile. */
+const target = (s: State) => (s.selected >= 0 ? s.selected : 0);
+
 /** Typed channel numbers auto-tune after this pause. */
 export const ENTRY_TIMEOUT_MS = 1800;
 let entryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -220,7 +224,7 @@ export const actions = {
   /** Pin cell `i`: it is shown large, and the previews re-fill around it. */
   pin(i?: number) {
     update((s) => {
-      const at = i ?? s.selected;
+      const at = i ?? s.selected; // nothing selected → nothing to pin
       if (at < 0 || at >= s.cells.length) return {};
       const cells = [...s.cells];
       if (s.pinned) {
@@ -290,8 +294,9 @@ export const actions = {
     update((s) => {
       if (s.focused || s.cells.length === 1) {
         const cells = [...s.cells];
-        cells[s.selected] = stepIn(groupKeys(s), cells[s.selected], dir);
-        return { cells, switchedAt: Date.now(), switchedCell: s.selected };
+        const at = target(s);
+        cells[at] = stepIn(groupKeys(s), cells[at], dir);
+        return { cells, switchedAt: Date.now(), switchedCell: at };
       }
       const keys = groupKeys(s);
       const fixed = s.pinned ? 1 : 0; // the pinned video stays; only previews page
@@ -305,8 +310,9 @@ export const actions = {
   channelStep(dir: number) {
     update((s) => {
       const cells = [...s.cells];
-      cells[s.selected] = stepIn(groupKeys(s), cells[s.selected], dir);
-      return { cells, switchedAt: Date.now(), switchedCell: s.selected };
+      const at = target(s);
+      cells[at] = stepIn(groupKeys(s), cells[at], dir);
+      return { cells, selected: at, switchedAt: Date.now(), switchedCell: at };
     });
   },
   assign(index: number, key: string) {
@@ -319,7 +325,7 @@ export const actions = {
   tune(num: number) {
     clearTimeout(entryTimer);
     const ch = CHANNEL_BY_NUM.get(num);
-    if (ch) actions.assign(get().selected, ch.key);
+    if (ch) actions.assign(target(get()), ch.key);
     update({ entry: "" });
     return !!ch;
   },
@@ -348,7 +354,8 @@ export const actions = {
     update((s) => {
       // Navigate across the tiles actually showing (a small group may not fill every slot).
       const geo = liveGeometry().slice(0, s.cells.length);
-      if (!geo.length || s.selected >= geo.length) return {};
+      if (!geo.length) return {};
+      if (s.selected < 0 || s.selected >= geo.length) return { selected: 0 }; // start again from the first tile
       const next = neighbour(geo, s.selected, dx, dy);
       return next >= 0 ? { selected: next } : {};
     });
@@ -359,7 +366,7 @@ export const actions = {
   /** Solo pin: show only video `i` (pinning it first if needed). */
   focus(i?: number) {
     const s = get();
-    const at = i ?? s.selected;
+    const at = i ?? target(s);
     if (!s.pinned || at > 0) actions.pin(at);
     update({ focused: true, selected: 0, switchedCell: -1 });
   },
@@ -376,16 +383,22 @@ export const actions = {
   escalate(i?: number) {
     const s = get();
     const at = i ?? s.selected;
+    if (at < 0) return;
     if (!s.pinned) actions.pin(at);
     else if (s.focused) return;
     else if (at > 0) actions.pin(at);
     else actions.focus(0);
   },
-  /** One pin level down: solo → pinned → grid. */
+  /** One pin level down: solo → pinned → grid → nothing selected. */
   deescalate() {
     const s = get();
     if (s.focused) actions.unfocus();
     else if (s.pinned) actions.unpin();
+    else actions.deselect();
+  },
+  /** Clear the selection (click on an empty part of the wall). */
+  deselect() {
+    update({ selected: -1 });
   },
   setMode(mode: Mode) {
     update({ mode, switchedAt: Date.now(), switchedCell: -1 });
@@ -442,7 +455,11 @@ export const actions = {
   },
 };
 
-/** The channel currently driving the "focused" context: the full-screen feed, or the selected tile. */
-export function activeKey(s: State): string {
-  return s.cells[s.selected];
+/** The channel shown in the sidebar panel: the selected tile, else the pinned video (else none). */
+export function activeKey(s: State): string | undefined {
+  if (s.selected >= 0) return s.cells[s.selected];
+  return s.pinned ? s.cells[0] : undefined;
 }
+
+/** The cell actions apply to when nothing is selected (exported for the guide, map and remote). */
+export const actionTarget = target;

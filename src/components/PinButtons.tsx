@@ -33,7 +33,8 @@ export function IconButton({ icon, label, on = false, onPress }: IconButtonProps
 /** Pin toggle for video `index` (default: the selected video). On = that video is the pinned one. */
 export function PinToggle({ index }: { index?: number }) {
   const t = useT();
-  const pinnedHere = useStore((s) => s.pinned && (index ?? s.selected) === 0);
+  // No selection while pinned: the toggle refers to the pinned video.
+  const pinnedHere = useStore((s) => s.pinned && (index ?? (s.selected < 0 ? 0 : s.selected)) === 0);
   return (
     <IconButton
       icon={pinnedHere ? <UnpinIcon /> : <PinIcon />}

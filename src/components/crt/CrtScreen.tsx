@@ -85,7 +85,7 @@ function videoCells(s: { cells: string[]; pinned: boolean; focused: boolean; sel
 
 /** Which pin buttons to draw into the CRT picture, mirroring PinControls (pin toggle, then the three sizes). */
 function pinButtons(s: { pinned: boolean; focused: boolean; selected: number; pinMode: string }, hover: boolean) {
-  const onPinned = s.focused || (s.pinned && s.selected === 0);
+  const onPinned = s.focused || (s.pinned && s.selected <= 0);
   if (!onPinned) return { cell: s.selected, buttons: [{ icon: "pin" as const, on: false }], opacity: hover ? 1 : 0.7 };
   return {
     cell: s.focused ? s.selected : 0,
@@ -282,7 +282,10 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
     const px = e.clientX - r.left;
     const py = e.clientY - r.top;
     const i = crtLayout(r.width, r.height, s).findIndex((q) => px >= q.x && px < q.x + q.w && py >= q.y && py < q.y + q.h);
-    if (i < 0) return;
+    if (i < 0) {
+      if (!dbl) actions.deselect(); // empty part of the tube
+      return;
+    }
     if (dbl) actions.escalate(s.pinned && i > 0 ? 0 : i);
     else if (s.pinned) actions.pin(i);
     else actions.select(i);
@@ -292,8 +295,8 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   // Pin controls float over the selected tile (PIN) or the pinned video (SOLO / UNPIN), matching the CRT geometry.
   const rects = size.w > 0 ? crtLayout(size.w, size.h, { ...pin, crtPreset: preset }) : [];
   let controls: { role: "selected" | "pinned" | "solo"; index: number; x: number; y: number; w: number; h: number } | null = null;
-  if (rects.length) {
-    const onPinned = pin.focused || (pin.pinned && selected === 0);
+  if (rects.length && (selected >= 0 || pin.pinned)) {
+    const onPinned = pin.focused || (pin.pinned && selected <= 0);
     const index = onPinned ? 0 : selected;
     const role = pin.focused ? "solo" : onPinned ? "pinned" : "selected";
     const q = rects[pin.focused ? 0 : index] ?? rects[0];

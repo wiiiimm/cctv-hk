@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CHANNEL_BY_KEY, fmtNum, type Channel } from "../../lib/channels";
 import { ATTRIBUTION, TILE, project, tilesFor, unproject } from "../../lib/maptiles";
-import { actions, store, useStore } from "../../lib/store";
+import { actionTarget, actions, store, useStore } from "../../lib/store";
 import { chName, useT } from "../../lib/i18n";
 
 const MIN_Z = 9;
@@ -89,7 +89,7 @@ export function GroupMap({ keys, fitKey }: { keys: string[]; fitKey: string }) {
     const at = cells.indexOf(ch.key);
     const s = store.get();
     if (at >= 0) (s.pinned && !s.focused ? actions.pin(at) : actions.select(at));
-    else actions.assign(s.selected, ch.key);
+    else actions.assign(actionTarget(s), ch.key);
   };
 
   // Draw on-wall markers last so they sit on top.

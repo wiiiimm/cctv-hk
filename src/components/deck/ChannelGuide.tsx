@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import { CHANNEL_BY_KEY, GROUPS, fmtNum } from "../../lib/channels";
-import { actions, groupKeysOf, store, useStore } from "../../lib/store";
+import { CHANNELS, CHANNEL_BY_KEY, GROUPS, fmtNum } from "../../lib/channels";
+import { fuzzySearch } from "../../lib/search";
+import { actionTarget, actions, groupKeysOf, store, useStore } from "../../lib/store";
 import { chAltName, chDistrict, chName, groupLabel, useT } from "../../lib/i18n";
 import { GroupMap } from "./GroupMap";
 import type { Lang } from "../../lib/store";
@@ -36,19 +37,9 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
 
   // Every channel matching the group / search; the list shows the first 400, the map shows them all.
   const matches = useMemo(() => {
-    const keys = query ? [...CHANNEL_BY_KEY.keys()] : groupKeysOf({ groupId, favourites, customGroups });
-    return keys
-      .map((k) => CHANNEL_BY_KEY.get(k)!)
-      .filter(
-        (c) =>
-          !query ||
-          String(c.num).includes(query) ||
-          c.code.toLowerCase().includes(query) ||
-          c.name.toLowerCase().includes(query) ||
-          c.nameZh.includes(query) ||
-          c.district.toLowerCase().includes(query) ||
-          c.districtZh.includes(query),
-      )
+    // Searching looks across every channel (fuzzy, best match first); otherwise show the group in order.
+    if (query) return fuzzySearch(CHANNELS, query);
+    return groupKeysOf({ groupId, favourites, customGroups }).map((k) => CHANNEL_BY_KEY.get(k)!);
   }, [query, groupId, favourites, customGroups]);
   const rows = useMemo(() => matches.slice(0, 400), [matches]);
 
@@ -162,7 +153,7 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
                 type="button"
                 className="guide-row"
                 onClick={() => {
-                  actions.assign(store.get().selected, c.key);
+                  actions.assign(actionTarget(store.get()), c.key);
                   onPick?.();
                 }}
                 title={t.assignTitle}

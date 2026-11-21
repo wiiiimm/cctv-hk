@@ -195,6 +195,9 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .group-map-foot { display: flex; justify-content: space-between; gap: var(--sp-2); font-size: var(--fs-xs); color: var(--dim); }
 
 /* ---------- selected / pinned video details ---------- */
+.panel-close { margin-left: auto; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 1px solid transparent; border-radius: var(--r-sm); background: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; }
+.panel-close:hover { color: var(--text); border-color: var(--line-2); background: var(--panel-3); }
+.panel-head .kind + .panel-close { margin-left: auto; }
 .panel { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: var(--sp-3); }
 .panel-head { display: flex; align-items: center; gap: var(--sp-2); }
 .panel-tag { font: 600 var(--fs-xs) / 1 var(--sans); letter-spacing: 0.1em; padding: 4px 6px; border-radius: var(--r-sm); background: var(--sel); color: var(--sel-ink); }

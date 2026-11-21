@@ -24,7 +24,7 @@ export function Remote() {
   const t = useT();
   const entry = useStore((s) => s.entry);
   const key = useStore(activeKey);
-  const ch = CHANNEL_BY_KEY.get(key);
+  const ch = key ? CHANNEL_BY_KEY.get(key) : undefined;
   const [lit, setLit] = useState<string | null>(null);
   const [open, setOpen] = useState(() => {
     try {

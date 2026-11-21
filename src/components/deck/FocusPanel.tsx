@@ -8,9 +8,11 @@ import { PinModes, PinToggle } from "../PinButtons";
 import { GroupMenu } from "./GroupMenu";
 
 export function FocusPanel({ compact = false }: { compact?: boolean }) {
-  const key = useStore(activeKey);
+  const key = useStore(activeKey) ?? "";
+  // A selected (not pinned) feed can be closed, which clears the selection.
+  const closable = useStore((s) => s.selected >= 0 && !(s.pinned && s.selected === 0));
   const focused = useStore((s) => s.focused);
-  const pinnedHere = useStore((s) => s.pinned && s.selected === 0);
+  const pinnedHere = useStore((s) => s.pinned && s.selected <= 0);
   const fav = useStore((s) => s.favourites.includes(key));
   const showMap = useStore((s) => s.showMap);
   const lang = useStore((s) => s.lang);
@@ -31,6 +33,11 @@ export function FocusPanel({ compact = false }: { compact?: boolean }) {
         <span className="panel-tag">{focused ? t.solo : pinnedHere ? t.pinned : t.selected}</span>
         <span className="num">CH {fmtNum(ch.num)}</span>
         <span className={`kind kind-${ch.kind}`}>{t.kind[ch.kind]}</span>
+        {closable && (
+          <button type="button" className="panel-close" onClick={actions.deselect} title={t.closeInfo} aria-label={t.closeInfo}>
+            ×
+          </button>
+        )}
       </header>
       <h2 className="panel-title">{chName(ch, lang)}</h2>
       <p className="panel-alt">{chAltName(ch, lang)}</p>

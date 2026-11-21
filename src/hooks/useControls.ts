@@ -93,7 +93,7 @@ export function useControls() {
             actions.toggleMute();
             break;
           case "*":
-            actions.toggleFavourite(s.cells[s.selected]);
+            if (s.selected >= 0) actions.toggleFavourite(s.cells[s.selected]);
             break;
           case "f":
           case "F":

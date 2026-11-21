@@ -35,7 +35,12 @@ export function VideoWall() {
   const shown = solo ? [selected] : cells.map((_, i) => i).slice(0, layout.rects.length);
 
   return (
-    <div className={`wall-area wall-${layout.kind}`} ref={ref}>
+    <div
+      className={`wall-area wall-${layout.kind}`}
+      ref={ref}
+      // Clicking empty space on the wall (not a tile) clears the selection.
+      onClick={(e) => e.target === e.currentTarget && actions.deselect()}
+    >
       {area.w > 0 &&
         shown.map((i, slot) => {
           const rect = layout.rects[slot];
