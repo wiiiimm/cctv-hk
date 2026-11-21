@@ -31,6 +31,15 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   Feed OSD font is VT323 for Latin + Fusion Pixel 12px Monospaced TC (OFL, `@fontsource`) for Chinese.
 - `src/pages/api/snap.ts` — same-origin relay for HKO photos (no CORS upstream). Allow-listed station codes only.
 
+## Design tokens
+
+- Chrome (top bar, sidebar, status bar) is styled from the tokens at the top of `src/styles/global.css`: surfaces
+  (`--well` < `--panel` < `--panel-2` < `--panel-3`), hairlines (`--line*`), text (`--text` / `--muted` / `--dim`),
+  accents (`--sel` yellow = active, `--rec` red = recording / on air, `--entry` green = channel entry), `--r` radii,
+  `--ctl-h` (every control is 28px tall), `--sans` for UI text and `--mono` for numbers.
+- Buttons share one base rule (`.icon-btn, .pill, .btn, .rm-key, ...`); `.pill.toggle` adds a status lamp.
+- The player (`.stage`, wall / OSD / CRT rules) pins its own font and greys and does not follow the chrome tokens.
+
 ## Data sources
 
 - TD traffic cameras: list built by `npm run data:td` into `src/data/td-cameras.json`; images `https://tdcctv.data.one.gov.hk/{KEY}.JPG` (CORS open, ~2 min).

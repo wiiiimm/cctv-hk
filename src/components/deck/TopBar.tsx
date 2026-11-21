@@ -16,7 +16,7 @@ function LayoutIcon({ c, r, sp }: { c: number; r: number; sp: number }) {
 }
 
 export function TopBar({ onGuide }: { onGuide: () => void }) {
-  const { gridCols, gridRows, pinned, focused, patrol, patrolSec, showMap, muted, mode, crtPreset, lang, theater } = useStore((s) => s);
+  const { gridCols, gridRows, pinned, focused, patrol, patrolSec, muted, mode, crtPreset, lang, theater } = useStore((s) => s);
   const t = useT();
   const now = useClock();
   const crtOn = mode === "crt";
@@ -31,24 +31,26 @@ export function TopBar({ onGuide }: { onGuide: () => void }) {
       </div>
 
       <div className="tb-group" role="group" aria-label={t.layout}>
-        <button type="button" className={`lay${focused ? " on" : ""}`} onClick={() => (focused ? actions.unfocus() : actions.focus())} title={t.soloTitle}>
-          <LayoutIcon c={1} r={1} sp={0} />
-        </button>
-        {LAYOUTS.map(([c, r]) => {
-          const [pc, pr, ps] = pinnedLayout(c, r);
-          const on = !focused && c === gridCols && r === gridRows;
-          return (
-            <button key={`${c}x${r}`} type="button" className={`lay${on ? " on" : ""}`} onClick={() => actions.setLayout(c, r)} title={pinned ? `${c}×${r} · ${hasPinnedVariant(c, r) ? `${t.pinned} 1+${slots(pc, pr, ps).length - 1}` : t.solo}` : `${c}×${r}`}>
-              {pinned && hasPinnedVariant(c, r) ? <LayoutIcon c={pc} r={pr} sp={ps} /> : <LayoutIcon c={c} r={r} sp={0} />}
-            </button>
-          );
-        })}
+        <div className="seg">
+          <button type="button" className={`lay${focused ? " on" : ""}`} onClick={() => (focused ? actions.unfocus() : actions.focus())} title={t.soloTitle}>
+            <LayoutIcon c={1} r={1} sp={0} />
+          </button>
+          {LAYOUTS.map(([c, r]) => {
+            const [pc, pr, ps] = pinnedLayout(c, r);
+            const on = !focused && c === gridCols && r === gridRows;
+            return (
+              <button key={`${c}x${r}`} type="button" className={`lay${on ? " on" : ""}`} onClick={() => actions.setLayout(c, r)} title={pinned ? `${c}×${r} · ${hasPinnedVariant(c, r) ? `${t.pinned} 1+${slots(pc, pr, ps).length - 1}` : t.solo}` : `${c}×${r}`}>
+                {pinned && hasPinnedVariant(c, r) ? <LayoutIcon c={pc} r={pr} sp={ps} /> : <LayoutIcon c={c} r={r} sp={0} />}
+              </button>
+            );
+          })}
+        </div>
         <PinToggle />
       </div>
 
       <div className="tb-group" role="group" aria-label={t.patrol}>
-        <button type="button" className={`pill${patrol ? " on rec" : ""}`} onClick={actions.togglePatrol} title={t.patrolTitle}>
-          {patrol ? `● ${t.patrol}` : t.patrol}
+        <button type="button" className={`pill toggle${patrol ? " on rec" : ""}`} onClick={actions.togglePatrol} title={t.patrolTitle} aria-pressed={patrol}>
+          {t.patrol}
         </button>
         <select value={patrolSec} onChange={(e) => actions.setPatrolSec(+e.target.value)} aria-label={t.patrolDwell}>
           {[5, 10, 15, 30, 60].map((s) => (
@@ -69,9 +71,8 @@ export function TopBar({ onGuide }: { onGuide: () => void }) {
       </div>
 
       <div className="tb-group">
-        <button type="button" className={`pill${theater ? " on" : ""}`} onClick={actions.toggleTheater} title={t.theaterTitle} aria-pressed={theater}>{t.theater}</button>
-        <button type="button" className={`pill${showMap ? " on" : ""}`} onClick={actions.toggleMap} title={t.mapTitle}>{t.map}</button>
-        <button type="button" className={`pill${!muted ? " on" : ""}`} onClick={actions.toggleMute} title={t.soundTitle}>
+        <button type="button" className={`pill toggle${theater ? " on" : ""}`} onClick={actions.toggleTheater} title={t.theaterTitle} aria-pressed={theater}>{t.theater}</button>
+        <button type="button" className={`pill toggle${!muted ? " on" : ""}`} onClick={actions.toggleMute} title={t.soundTitle} aria-pressed={!muted}>
           {muted ? t.muted : t.sound}
         </button>
         <button type="button" className="pill lang" onClick={actions.toggleLang} title={t.langTitle} lang={lang === "zh" ? "en" : "zh-Hant"}>

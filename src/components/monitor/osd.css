@@ -1,0 +1,39 @@
+/* Tile captions (location + meta): each sits on a 85%-black box so white text stays legible over busy footage.
+   Status badges and the selected tile's yellow channel tag keep their own colours. */
+.tile .osd-tl b,
+.tile .osd-title > span,
+.tile .osd-stamp {
+  background: rgba(0, 0, 0, 0.85);
+  padding: 2px 5px 3px;
+  text-shadow: none;
+}
+.tile .osd-tl .kind {
+  background: rgba(0, 0, 0, 0.85);
+}
+.tile.selected .osd-tl b {
+  background: var(--sel);
+  color: #000;
+}
+.tile .osd-bottom {
+  background: none;
+  padding: 0 7px 6px;
+}
+.tile .osd-title {
+  gap: 3px;
+  align-items: flex-start;
+}
+.tile .osd-title > span {
+  max-width: 100%;
+}
+
+/* Tiny tiles (e.g. 4×3 on a phone): keep the channel number on one line and drop secondary labels. */
+.tile .osd-tl b,
+.tile .osd-tr .badge {
+  white-space: nowrap;
+}
+@container (max-width: 180px) {
+  .tile .osd-tl .kind,
+  .tile .osd-tr {
+    display: none;
+  }
+}

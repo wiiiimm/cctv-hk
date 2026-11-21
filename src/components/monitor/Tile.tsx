@@ -5,6 +5,7 @@ import { actions, store, useStore } from "../../lib/store";
 import { chAltName, chName, useT } from "../../lib/i18n";
 import { PinControls, type PinRole } from "./PinControls";
 import { ago, hkStamp, useClock } from "../../hooks/useClock";
+import "./osd.css";
 
 interface Props {
   /** Which pin controls to show on this tile, if any. */

@@ -68,6 +68,20 @@ function text(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, si
   ctx.fillText(s, x, y);
 }
 
+/** Caption on an 85%-black box so white text stays legible over busy footage. */
+function caption(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, size: number, align: CanvasTextAlign = "left") {
+  ctx.font = `${size}px ${OSD}`;
+  const w = ctx.measureText(s).width;
+  const px = size * 0.3;
+  const left = align === "right" ? x - w : align === "center" ? x - w / 2 : x;
+  ctx.fillStyle = "rgba(0,0,0,0.85)";
+  ctx.fillRect(left - px, y - size * 0.12, w + px * 2, size * 1.15);
+  ctx.textAlign = align;
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "#f2f2f2";
+  ctx.fillText(s, x, y);
+}
+
 /** Steady status badge, right-aligned at (right, y): white text on a red (or amber) block. */
 function badge(ctx: CanvasRenderingContext2D, label: string, right: number, y: number, size: number, bg: string) {
   ctx.font = `${size}px ${OSD}`;
@@ -119,8 +133,8 @@ function drawCell(ctx: CanvasRenderingContext2D, key: string, x: number, y: numb
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(label, x + pad, y + pad * 0.6);
-    text(ctx, t.kind[ch.kind].toUpperCase(), x + pad + tw + fs * 0.7, y + pad * 0.6, fs);
-  } else text(ctx, `CH${fmtNum(ch.num)} ${t.kind[ch.kind].toUpperCase()}`, x + pad, y + pad * 0.6, fs);
+    caption(ctx, t.kind[ch.kind].toUpperCase(), x + pad + tw + fs * 0.7, y + pad * 0.6, fs);
+  } else caption(ctx, `CH${fmtNum(ch.num)} ${t.kind[ch.kind].toUpperCase()}`, x + pad, y + pad * 0.6, fs);
   if (ch.kind === "yt") {
     if (snap.live) badge(ctx, t.live, x + w - pad, y + pad * 0.6, fs, "#d71f1f");
   } else {
@@ -141,8 +155,8 @@ function drawCell(ctx: CanvasRenderingContext2D, key: string, x: number, y: numb
   const full = label;
   while (label.length > 2 && ctx.measureText(label + "…").width > room) label = label.slice(0, -1);
   if (label !== full) label += "…";
-  text(ctx, label, x + pad, y + h - fs - pad * 0.6 - (big ? fs * 1.1 : 0), fs);
-  if (showStamp) text(ctx, stamp, big ? x + pad : x + w - pad, y + h - fs - pad * 0.6, fs, "#f2f2f2", big ? "left" : "right");
+  caption(ctx, label, x + pad, y + h - fs - pad * 0.6 - (big ? fs * 1.25 : 0), fs);
+  if (showStamp) caption(ctx, stamp, big ? x + pad : x + w - pad, y + h - fs - pad * 0.6, fs, big ? "left" : "right");
 }
 
 function drawMap(ctx: CanvasRenderingContext2D, lat: number, lon: number, approx: boolean, x: number, y: number, w: number, h: number, now: number) {

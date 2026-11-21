@@ -70,7 +70,7 @@ export function pinnedLayout(cols: number, rows: number): [number, number, numbe
 }
 
 const STORAGE_KEY = "cctv-hk:v1";
-const PERSIST: (keyof State)[] = ["gridCols", "gridRows", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "patrolSec", "showMap", "muted"];
+const PERSIST: (keyof State)[] = ["gridCols", "gridRows", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "patrolSec", "muted"];
 
 function groupKeys(s: Pick<State, "groupId" | "favourites">): string[] {
   if (s.groupId === "favourites") return s.favourites.length ? s.favourites : GROUP_BY_ID.get("featured")!.keys;
