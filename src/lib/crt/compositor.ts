@@ -7,6 +7,7 @@ import { getSnap } from "../snapshots";
 import { DARKEN, TILE, project, tileImage, tileUrl } from "../maptiles";
 import { hkStamp } from "../../hooks/useClock";
 import { arrange, type PinMode } from "../arrange";
+import { ICON_PATHS, type IconName } from "../../components/icons";
 
 export interface ScreenView {
   cells: string[];
@@ -30,6 +31,11 @@ export interface ScreenView {
   lang: Lang;
   /** Canvas pixels per CSS pixel, so OSD text matches the DOM wall's sizes. */
   scale: number;
+  /**
+   * Pin buttons drawn into the picture (so every CRT effect applies to them): which cell, which buttons
+   * (left → right), and their opacity. Invisible DOM buttons on top handle the clicks.
+   */
+  pinUi?: { cell: number; buttons: { icon: IconName; on: boolean }[]; opacity: number };
   /** Safe margin (fraction of each side) so the wall clears the tube's curved edge and vignette. */
   inset: number;
 }
@@ -237,6 +243,52 @@ function drawSelection(ctx: CanvasRenderingContext2D, r: CellRect, k: number) {
   }
 }
 
+// Same geometry as the DOM .pin-controls / .icon-btn: 28×26 buttons, right 8px, bottom 34px; 4px after the pin
+// toggle, 2px between the pinned-size buttons.
+const BTN_W = 28;
+const BTN_H = 26;
+const pathCache = new Map<string, Path2D>();
+const path2d = (d: string) => {
+  let p = pathCache.get(d);
+  if (!p) pathCache.set(d, (p = new Path2D(d)));
+  return p;
+};
+
+function drawPinUi(ctx: CanvasRenderingContext2D, r: CellRect, ui: NonNullable<ScreenView["pinUi"]>, k: number) {
+  if (ui.opacity <= 0) return;
+  const gaps: number[] = ui.buttons.map((_, i) => (i === 0 ? 0 : i === 1 ? 4 : 2));
+  const total = ui.buttons.length * BTN_W + gaps.reduce((a, b) => a + b, 0);
+  let x = r.x + r.w - (8 + total) * k;
+  const y = r.y + r.h - (34 + BTN_H) * k;
+  ctx.save();
+  ctx.globalAlpha = ui.opacity;
+  ui.buttons.forEach((b, i) => {
+    x += gaps[i] * k;
+    // Button body
+    const rr = 4 * k;
+    ctx.beginPath();
+    ctx.roundRect(x, y, BTN_W * k, BTN_H * k, rr);
+    ctx.fillStyle = b.on ? "#ffd60a" : "rgba(24,28,34,0.9)";
+    ctx.fill();
+    ctx.lineWidth = 1 * k;
+    ctx.strokeStyle = b.on ? "#ffd60a" : "#303642";
+    ctx.stroke();
+    // Icon (24-unit path data, drawn at 16px like the DOM buttons)
+    const s = (16 * k) / 24;
+    ctx.save();
+    ctx.translate(x + (BTN_W * k - 24 * s) / 2, y + (BTN_H * k - 24 * s) / 2);
+    ctx.scale(s, s);
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = b.on ? "#000" : "#e4e8ee";
+    for (const d of ICON_PATHS[b.icon]) ctx.stroke(path2d(d));
+    ctx.restore();
+    x += BTN_W * k;
+  });
+  ctx.restore();
+}
+
 /** Draws the screen and returns each visible cell's rectangle (by cell index) in canvas pixels. */
 export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, v: ScreenView, now: number): Map<number, CellRect> {
   const rects = new Map<number, CellRect>();
@@ -258,6 +310,10 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
     drawCell(ctx, v.cells[ci], r.x, r.y, r.w, r.h, now, big, v.videoCells.includes(ci), v.lang, v.scale, highlight);
     if (highlight) drawSelection(ctx, r, v.scale);
   });
+  if (v.pinUi) {
+    const r = rects.get(v.pinUi.cell);
+    if (r) drawPinUi(ctx, r, v.pinUi, v.scale);
+  }
 
   // Screen-level OSD (channel number on change, picture mode, sequence) — a notch above the captions.
   const big = 20 * v.scale;

@@ -6,13 +6,25 @@ import { writeFile } from "node:fs/promises";
 const BASE = "https://static.data.gov.hk/td/traffic-snapshot-images/code/Traffic_Camera_Locations_";
 const OUT = new URL("../src/data/td-cameras.json", import.meta.url);
 
+/** The TD XML escapes characters (e.g. "Central &amp; Western"); turn entities back into text. */
+function decode(text) {
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
 async function load(lang) {
   const res = await fetch(`${BASE}${lang}.xml`);
   if (!res.ok) throw new Error(`TD ${lang} list: HTTP ${res.status}`);
   const xml = await res.text();
   const rows = new Map();
   for (const [, body] of xml.matchAll(/<image>([\s\S]*?)<\/image>/g)) {
-    const tag = (t) => body.match(new RegExp(`<${t}>([\\s\\S]*?)</${t}>`))?.[1].trim() ?? "";
+    const tag = (t) => decode(body.match(new RegExp(`<${t}>([\\s\\S]*?)</${t}>`))?.[1].trim() ?? "");
     rows.set(tag("key"), {
       key: tag("key"),
       region: tag("region"),

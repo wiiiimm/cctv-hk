@@ -29,7 +29,7 @@ export function VideoWall() {
     if (!solo && capacity > 0) actions.setCapacity(capacity);
   }, [capacity, solo]);
   useEffect(() => {
-    publishGeometry(solo ? [] : layout.rects);
+    publishGeometry(solo ? [] : layout.rects.slice(0, cells.length));
   });
 
   const shown = solo ? [selected] : cells.map((_, i) => i).slice(0, layout.rects.length);

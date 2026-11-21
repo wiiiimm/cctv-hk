@@ -22,6 +22,8 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   + below — the classic 1+N) or "wide" (block as wide as fits, previews either side + below). Previews and the pinned
   block share one regular grid so every preview is the same size and aligned. Enter/double-click step up, Esc down;
   clicking a small tile while pinned pins it instead; unpinning returns the video to its original cell (`pinFrom`).
+  Switching camera group keeps the pin only if the pinned channel is in the new group; otherwise the pin is released
+  (same rule when restoring saved state). The wall never shows a channel twice.
 - No right sidebar. The selected (or pinned) video's details + map sit at the top of the left sidebar
   (`components/deck/Sidebar.tsx`), above the channel guide. Theatre mode (`T`) hides the whole sidebar.
 - Pin / single-view controls are one component and one style everywhere (`components/PinButtons.tsx`, `.icon-btn`):

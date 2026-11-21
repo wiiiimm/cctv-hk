@@ -172,6 +172,24 @@ const UNIFORMS = [
 ] as const;
 type U = (typeof UNIFORMS)[number];
 
+/**
+ * Where a point of the flat picture ends up on the curved screen: the inverse of the shader's barrel warp
+ * (`src = c · (1 + c.yx² · k)` in −1..1 coordinates). Also returns the local scale there, so DOM overlays
+ * (pin buttons) can follow the distortion.
+ */
+export function unwarp(x: number, y: number, w: number, h: number, curvature: number) {
+  const sx = (x / w) * 2 - 1;
+  const sy = (y / h) * 2 - 1;
+  let cx = sx;
+  let cy = sy;
+  for (let i = 0; i < 8; i++) {
+    cx = sx / (1 + cy * cy * curvature);
+    cy = sy / (1 + cx * cx * curvature);
+  }
+  const scale = 1 / (1 + ((cx * cx + cy * cy) / 2) * curvature * 2);
+  return { x: ((cx + 1) / 2) * w, y: ((cy + 1) / 2) * h, scale };
+}
+
 /** One frame of the power sequence. `ON` is the steady state. */
 export interface PowerFx {
   ys: number;

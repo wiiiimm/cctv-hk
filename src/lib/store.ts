@@ -91,11 +91,11 @@ function initial(): State {
   if (!base.pinned) base.focused = false;
   base.previewSize = clampPreview(Number(base.previewSize) || PREVIEW_DEFAULT);
   if (base.pinMode !== "wide" && base.pinMode !== "side") base.pinMode = "side";
-  // Restore the saved wall, but only previews that belong to the current group (no duplicates). A pinned video
-  // (cell 0) is kept even if it's from another group — it was pinned on purpose.
+  // Restore the saved wall, but only channels that belong to the current group (no duplicates). A saved pin that
+  // isn't in the group is released — the same rule as switching group.
   const groupSet = new Set(groupKeys(base));
   const saved = base.cells.filter((k) => CHANNEL_BY_KEY.has(k));
-  const pinnedKey = base.pinned ? saved[0] : undefined;
+  const pinnedKey = base.pinned && groupSet.has(saved[0]) ? saved[0] : undefined;
   const previews = [...new Set(saved.slice(base.pinned ? 1 : 0))].filter((k) => groupSet.has(k) && k !== pinnedKey);
   base.cells = pinnedKey ? [pinnedKey, ...previews] : previews;
   if (!pinnedKey) base.pinned = base.focused = false;
@@ -238,12 +238,29 @@ export const actions = {
     else if (s.selected > 0 && !s.focused) actions.pin(s.selected);
     else actions.unpin();
   },
+  /**
+   * Switch camera group. A pinned video stays pinned only if it is part of the new group (previews refill around
+   * it without repeating it); otherwise the pin is released and the wall shows the group's first page.
+   */
   loadGroup(groupId: string) {
     update((s) => {
       const keys = groupKeys({ ...s, groupId });
-      const fixed = s.pinned ? 1 : 0;
-      const cells = [...s.cells.slice(0, fixed), ...pageCells(keys, 0, Math.max(1, s.cells.length - fixed))];
-      return { groupId, page: 0, cells, switchedAt: Date.now(), switchedCell: -1 };
+      const pinnedKey = s.pinned ? s.cells[0] : undefined;
+      if (pinnedKey && keys.includes(pinnedKey)) {
+        const previews = pageCells(keys.filter((k) => k !== pinnedKey), 0, Math.max(1, s.cells.length - 1));
+        return { groupId, page: 0, cells: [pinnedKey, ...previews], selected: 0, switchedAt: Date.now(), switchedCell: -1 };
+      }
+      const n = s.pinned ? s.cells.length : Math.max(1, s.cells.length);
+      return {
+        groupId,
+        page: 0,
+        pinned: false,
+        focused: false,
+        cells: pageCells(keys, 0, n),
+        selected: 0,
+        switchedAt: Date.now(),
+        switchedCell: -1,
+      };
     });
   },
   pageStep(dir: number) {
@@ -306,8 +323,9 @@ export const actions = {
   /** Move the selection to the visually adjacent tile in the arrangement currently on screen. */
   moveSelection(dx: number, dy: number) {
     update((s) => {
-      const geo = liveGeometry();
-      if (geo.length !== s.cells.length) return {};
+      // Navigate across the tiles actually showing (a small group may not fill every slot).
+      const geo = liveGeometry().slice(0, s.cells.length);
+      if (!geo.length || s.selected >= geo.length) return {};
       const next = neighbour(geo, s.selected, dx, dy);
       return next >= 0 ? { selected: next } : {};
     });

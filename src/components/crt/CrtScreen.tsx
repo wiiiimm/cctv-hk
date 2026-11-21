@@ -4,7 +4,7 @@ import { getSnap, retain, useSnap } from "../../lib/snapshots";
 import { actions, store, useStore } from "../../lib/store";
 import { drawScreen } from "../../lib/crt/compositor";
 import { arrange, publishGeometry, type PinMode, type Rect } from "../../lib/arrange";
-import { CrtRenderer, ON, powerOff, powerOn } from "../../lib/crt/renderer";
+import { CrtRenderer, ON, powerOff, powerOn, unwarp } from "../../lib/crt/renderer";
 import { crtInset, presetById, videoFilter, type CrtPreset } from "../../lib/crt/presets";
 import "./crt-video.css";
 import { chName, useT } from "../../lib/i18n";
@@ -83,6 +83,22 @@ function videoCells(s: { cells: string[]; pinned: boolean; focused: boolean; sel
   return out;
 }
 
+/** Which pin buttons to draw into the CRT picture, mirroring PinControls (pin toggle, then the three sizes). */
+function pinButtons(s: { pinned: boolean; focused: boolean; selected: number; pinMode: string }, hover: boolean) {
+  const onPinned = s.focused || (s.pinned && s.selected === 0);
+  if (!onPinned) return { cell: s.selected, buttons: [{ icon: "pin" as const, on: false }], opacity: hover ? 1 : 0.7 };
+  return {
+    cell: s.focused ? s.selected : 0,
+    buttons: [
+      { icon: "unpin" as const, on: true },
+      { icon: "pinWide" as const, on: !s.focused && s.pinMode === "wide" },
+      { icon: "pinSide" as const, on: !s.focused && s.pinMode === "side" },
+      { icon: (s.focused ? "exitSolo" : "solo") as "exitSolo" | "solo", on: s.focused },
+    ],
+    opacity: hover ? 1 : 0,
+  };
+}
+
 /** The CRT wall arrangement in CSS px of the tube (same engine as the DOM wall, inside the safe-area inset). */
 function crtLayout(w: number, h: number, s: { previewSize: number; pinned: boolean; pinMode: PinMode; focused: boolean; crtPreset: string }): Rect[] {
   const m = crtInset(presetById(s.crtPreset).curvature);
@@ -101,6 +117,8 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   exitingRef.current = exiting;
   const wrapRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  // Pointer over the tube: pinned / full-view buttons only show on hover (like the normal wall).
+  const hoverRef = useRef(false);
   const [fallback, setFallback] = useState(false);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const cells = useStore((s) => s.cells);
@@ -226,6 +244,7 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
           patrol: s.patrol,
           // Tiles that play a real YouTube player on top are left blank on the canvas.
           videoCells: videoCells(s, Number.MAX_SAFE_INTEGER),
+          pinUi: pinButtons(s, hoverRef.current),
           lang: s.lang,
           inset: crtInset(preset.curvature),
           scale: src.width / Math.max(1, wrap.clientWidth),
@@ -280,17 +299,33 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
     const q = rects[pin.focused ? 0 : index] ?? rects[0];
     controls = { role, index, x: q.x, y: q.y, w: q.w, h: q.h };
   }
+  // Follow the tube's barrel distortion: move (and slightly shrink) the buttons to where the curved picture puts
+  // their spot in the tile. The buttons sit at the tile's bottom-right (see .pin-controls: right 8px, bottom 34px).
+  let warp: React.CSSProperties = {};
+  if (controls) {
+    const cx = controls.x + controls.w - 8 - 30;
+    const cy = controls.y + controls.h - 34 - 14;
+    const o = unwarp(cx, cy, size.w, size.h, presetById(preset).curvature);
+    warp = { ["--pin-dx" as string]: `${(o.x - cx).toFixed(1)}px`, ["--pin-dy" as string]: `${(o.y - cy).toFixed(1)}px`, ["--pin-scale" as string]: o.scale.toFixed(3) };
+  }
   // Same capacity / navigation contract as the DOM wall.
   const capacity = rects.length;
   useEffect(() => {
     if (!pin.focused && capacity > 0) actions.setCapacity(capacity);
   }, [capacity, pin.focused]);
   useEffect(() => {
-    publishGeometry(pin.focused ? [] : rects);
+    publishGeometry(pin.focused ? [] : rects.slice(0, cells.length));
   });
 
   return (
-    <div className={`crt-tube${fallback ? " no-gl" : ""}`} ref={wrapRef} onClick={(e) => onPointer(e, false)} onDoubleClick={(e) => onPointer(e, true)}>
+    <div
+      className={`crt-tube${fallback ? " no-gl" : ""}`}
+      ref={wrapRef}
+      onClick={(e) => onPointer(e, false)}
+      onDoubleClick={(e) => onPointer(e, true)}
+      onMouseEnter={() => (hoverRef.current = true)}
+      onMouseLeave={() => (hoverRef.current = false)}
+    >
       <div ref={hostRef} className="crt-host" role="img" aria-label={activeCh ? `CH ${fmtNum(activeCh.num)} ${chName(activeCh, lang)}` : "CRT"} />
       {videoCells({ cells, pinned: pin.pinned, focused: pin.focused, selected }, rects.length).map((i) => {
         const rect = pin.focused ? rects[0] : rects[i];
@@ -303,7 +338,11 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
       })}
       <div className="crt-glass" />
       {controls && (
-        <div className={`crt-pin-anchor ${controls.role}`} style={{ left: controls.x, top: controls.y, width: controls.w, height: controls.h }}>
+        <div
+          className={`crt-pin-anchor ${controls.role}`}
+          // Same per-mode CSS look as the YouTube players, so the buttons read as part of the CRT picture.
+          style={{ left: controls.x, top: controls.y, width: controls.w, height: controls.h, ...videoLook(presetById(preset)), ...warp }}
+        >
           <PinControls role={controls.role} index={controls.index} />
         </div>
       )}
