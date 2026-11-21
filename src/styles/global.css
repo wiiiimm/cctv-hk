@@ -138,7 +138,8 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .pill.lang { min-width: 44px; color: var(--text); }
 
 .clock { margin-left: auto; display: flex; gap: var(--sp-2); align-items: baseline; font-family: var(--mono); font-size: var(--fs-md); font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
-.clock b { color: var(--text); font-size: 16px; font-weight: 500; }
+/* Time uses exactly the date's font; only the colour is brighter. */
+.clock b { font: inherit; color: var(--text); }
 .clock span:last-child { font: 600 var(--fs-xs) var(--sans); letter-spacing: 0.1em; color: var(--dim); }
 
 /* ---------- sidebar: details, guide, remote — three sections on one surface ---------- */
@@ -151,6 +152,47 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .kind-hko { color: var(--hko); }
 .kind-yt { color: var(--yt); }
 .sidebar .kind { font: 600 var(--fs-xs) / 1.4 var(--sans); letter-spacing: 0.06em; padding: 1px 6px; border-radius: var(--r-sm); border-color: color-mix(in srgb, currentColor 40%, transparent); background: color-mix(in srgb, currentColor 9%, transparent); white-space: nowrap; }
+
+/* ---------- camera groups: picker tools and "add to my groups" menu ---------- */
+.group-pick { display: flex; gap: var(--sp-1); }
+.group-pick select { flex: 1; min-width: 0; }
+.group-name { display: flex; gap: var(--sp-1); }
+.group-name .search { flex: 1; }
+.group-tools { display: flex; gap: var(--sp-3); margin-top: calc(var(--sp-1) * -1); }
+.group-tools .link { background: none; border: 0; padding: 0; color: var(--muted); font-size: var(--fs-sm); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.group-tools .link:hover { color: var(--text); }
+.group-tools .link.danger:hover { color: var(--rec); }
+.group-menu-wrap { position: relative; display: inline-flex; }
+.group-menu { position: absolute; z-index: 30; top: calc(100% + 6px); right: 0; width: 230px; padding: var(--sp-2); border-radius: var(--r); background: var(--panel-2); border: 1px solid var(--line-2); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55); display: grid; gap: 2px; }
+.group-menu-title { font-size: var(--fs-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); padding: 2px 4px 6px; }
+.group-menu-row { display: flex; align-items: center; gap: var(--sp-2); padding: 5px 4px; border-radius: var(--r-sm); font-size: var(--fs-md); color: var(--text); cursor: pointer; }
+.group-menu-row:hover { background: var(--panel-3); }
+.group-menu-row input { accent-color: var(--sel); }
+.group-menu-row .count { margin-left: auto; color: var(--dim); font: var(--fs-sm) var(--mono); }
+.group-menu-new { display: flex; gap: var(--sp-1); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.group-menu-new input { flex: 1; min-width: 0; height: var(--ctl-h); padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--line-2); background: var(--well); color: var(--text); font-size: var(--fs-md); }
+
+/* ---------- group map view (List / Map toggle under the camera group) ---------- */
+.guide-search-row { display: flex; gap: var(--sp-1); }
+.guide-search-row .search { flex: 1; min-width: 0; }
+.view-toggle { display: inline-flex; padding: 1px; gap: 1px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--well); height: var(--ctl-h); }
+.view-toggle button { border: 0; border-radius: var(--r-sm); background: none; color: var(--muted); font-size: var(--fs-sm); padding: 0 8px; }
+.view-toggle button.on { background: var(--panel-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-3); }
+.group-map { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; padding: var(--sp-2); }
+.group-map-view { position: relative; flex: 1; min-height: 160px; overflow: hidden; border: 1px solid var(--line-2); border-radius: var(--r); background: #0d0f12; cursor: grab; touch-action: none; }
+.group-map-view:active { cursor: grabbing; }
+.gm-pin { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; padding: 0; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.7); background: var(--dim); cursor: pointer; z-index: 1; }
+.gm-pin.kind-td { background: var(--td); }
+.gm-pin.kind-hko { background: var(--hko); }
+.gm-pin.kind-yt { background: var(--yt); }
+.gm-pin:hover { transform: scale(1.6); z-index: 3; }
+.gm-pin.on-wall { width: 12px; height: 12px; margin: -6px 0 0 -6px; box-shadow: 0 0 0 2px var(--sel); z-index: 2; }
+.gm-pin.selected, .gm-pin.pinned { width: 14px; height: 14px; margin: -7px 0 0 -7px; background: var(--sel); box-shadow: 0 0 0 2px #000, 0 0 10px var(--sel); z-index: 3; }
+.gm-pin.pinned::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--sel); }
+.group-map-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: var(--fs-xs); color: var(--muted); }
+.group-map-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.group-map-legend .gm-pin { position: static; margin: 0; pointer-events: none; }
+.group-map-foot { display: flex; justify-content: space-between; gap: var(--sp-2); font-size: var(--fs-xs); color: var(--dim); }
 
 /* ---------- selected / pinned video details ---------- */
 .panel { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: var(--sp-3); }

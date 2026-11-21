@@ -2,6 +2,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { CHANNEL_BY_KEY, GROUPS, fmtNum } from "../../lib/channels";
 import { actions, groupKeysOf, store, useStore } from "../../lib/store";
 import { chAltName, chDistrict, chName, groupLabel, useT } from "../../lib/i18n";
+import { GroupMap } from "./GroupMap";
 import type { Lang } from "../../lib/store";
 
 export function ChannelGuide({ onPick }: { onPick?: () => void }) {
@@ -15,9 +16,26 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
   const lang = useStore((s) => s.lang);
   const t = useT();
   const [q, setQ] = useState("");
+  // List or map view of the group (remembered per browser).
+  const [view, setView] = useState<"list" | "map">(() => {
+    try {
+      return localStorage.getItem("cctv-hk:guide-view") === "map" ? "map" : "list";
+    } catch {
+      return "list";
+    }
+  });
+  const chooseView = (v: "list" | "map") => {
+    setView(v);
+    try {
+      localStorage.setItem("cctv-hk:guide-view", v);
+    } catch {
+      /* ignore */
+    }
+  };
   const query = useDeferredValue(q.trim().toLowerCase());
 
-  const rows = useMemo(() => {
+  // Every channel matching the group / search; the list shows the first 400, the map shows them all.
+  const matches = useMemo(() => {
     const keys = query ? [...CHANNEL_BY_KEY.keys()] : groupKeysOf({ groupId, favourites, customGroups });
     return keys
       .map((k) => CHANNEL_BY_KEY.get(k)!)
@@ -31,8 +49,8 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
           c.district.toLowerCase().includes(query) ||
           c.districtZh.includes(query),
       )
-      .slice(0, 400);
   }, [query, groupId, favourites, customGroups]);
+  const rows = useMemo(() => matches.slice(0, 400), [matches]);
 
   const other = (lang === "zh" ? "en" : "zh") as Lang;
   const section = (sec: string) => GROUPS.filter((g) => g.section === sec);
@@ -120,8 +138,21 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
             </button>
           </div>
         )}
-        <input className="search" type="search" placeholder={t.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t.searchLabel} />
+        <div className="guide-search-row">
+          <input className="search" type="search" placeholder={t.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t.searchLabel} />
+          <span className="view-toggle" role="group" aria-label={t.guideView}>
+            <button type="button" className={view === "list" ? "on" : ""} aria-pressed={view === "list"} onClick={() => chooseView("list")}>
+              {t.listView}
+            </button>
+            <button type="button" className={view === "map" ? "on" : ""} aria-pressed={view === "map"} onClick={() => chooseView("map")}>
+              {t.mapView}
+            </button>
+          </span>
+        </div>
       </div>
+      {view === "map" ? (
+        <GroupMap keys={matches.map((c) => c.key)} fitKey={`${groupId}|${query}`} />
+      ) : (
       <ul className="guide-list">
         {rows.map((c) => {
           const fav = favourites.includes(c.key);
@@ -154,6 +185,7 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
         })}
         {rows.length === 0 && <li className="empty">{current && !query ? t.emptyGroup : t.noMatch}</li>}
       </ul>
+      )}
     </section>
   );
 }

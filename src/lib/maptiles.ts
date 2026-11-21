@@ -13,6 +13,12 @@ export function project(lat: number, lon: number, z: number) {
   };
 }
 
+/** Inverse of `project`: world tile coordinates at zoom z → lat/lon. */
+export function unproject(x: number, y: number, z: number) {
+  const n = 2 ** z;
+  return { lon: (x / n) * 360 - 180, lat: (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI };
+}
+
 export function tileUrl(z: number, x: number, y: number) {
   return `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
 }

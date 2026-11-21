@@ -184,11 +184,15 @@ const TOPICS: { id: string; label: string; labelZh: string; keys: string[]; matc
     keys: ["hko:VPA", "hko:VPB", "hko:GSI", "hko:HK2", "hko:IC1", "hko:IC2", "hko:KLT", "yt:TIYZVyzOk4k", "yt:WkcmApaOvWc", "yt:O1oQhMlBiOA", "yt:6YYmUo2TgJ0"],
   },
   {
+    // Airport trackers, the HZMB port, the TM-CLK tunnel's southern portal (which lands at it; the Tuen Mun end is
+    // left out), and the North Lantau Highway only at
+    // its Tung Chung end, where it feeds the airport / HZMB link roads. The rest of the corridor (Tai Ho Wan,
+    // Siu Ho Wan, Pak Mong, Sunny Bay, Lantau Link) stays in the Lantau group.
     id: "airport",
     label: "Airport & HZMB",
     labelZh: "機場及港珠澳大橋",
     keys: ["yt:ygC5wni2DMQ", "yt:JPREngCARsA"],
-    match: /HZMB|TM-CLK/,
+    match: /HZMB|TM-CLK Tunnel Southern Portal|Tung Wing Road|North Lantau Highway near (Tung Chung|Caribbean Coast|Ying Tung)/,
   },
   { id: "tunnels", label: "Tunnels", labelZh: "隧道", keys: [], match: /Tunnel/ },
   { id: "bridges", label: "Bridges", labelZh: "橋樑", keys: [], match: /Bridge|Tsing Ma|Ting Kau|Stonecutters|Kap Shui Mun|Lantau Link/ },
