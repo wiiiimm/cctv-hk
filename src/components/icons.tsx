@@ -9,6 +9,7 @@ export const ICON_PATHS = {
   bigger: ["M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"],
   pinWide: ["M3 4h18v11H3zM3 18h5v2H3zM10 18h4v2h-4zM16 18h5v2h-5z"],
   pinSide: ["M3 4h12v10H3zM17 4h4v4h-4zM17 10h4v4h-4zM3 17h4v3H3zM9 17h6v3H9zM17 17h4v3h-4z"],
+  groups: ["M3 6h6l2 2h10v11H3z", "M12 11v5M9.5 13.5h5"],
 } as const;
 export type IconName = keyof typeof ICON_PATHS;
 
@@ -40,3 +41,5 @@ export const BiggerIcon = (p: P) => <Icon name="bigger" {...p} />;
 export const PinWideIcon = (p: P) => <Icon name="pinWide" {...p} />;
 /** Pinned "side": a picture with a column of previews on its right and a row below. */
 export const PinSideIcon = (p: P) => <Icon name="pinSide" {...p} />;
+/** Folder with a plus: add to my groups. */
+export const GroupsIcon = (p: P) => <Icon name="groups" {...p} />;

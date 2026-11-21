@@ -9,7 +9,8 @@ export function StatusBar() {
   const n = Math.max(1, s.cells.length - (s.pinned ? 1 : 0));
   const pages = Math.max(1, Math.ceil(keys.length / n));
   const g = GROUP_BY_ID.get(s.groupId);
-  const group = s.groupId === "favourites" ? t.favourites : g ? groupLabel(g, s.lang) : "";
+  const custom = s.customGroups.find((c) => `custom:${c.id}` === s.groupId);
+  const group = s.groupId === "favourites" ? t.favourites : custom ? custom.name : g ? groupLabel(g, s.lang) : "";
 
   return (
     <footer className="statusbar">

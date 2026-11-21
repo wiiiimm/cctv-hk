@@ -1,5 +1,7 @@
 /* CSS-only CRT look for YouTube players (WebGL can't draw them). Driven per picture mode by CSS variables set in
    CrtYouTube: --scan-a/--scan-p (scanline darkness / pitch), --mask-a, --vig, --noise, --roll, --flicker, --tint. */
+/* Clicks pass through to the tube, which maps them to the tile (select / pin / full view) — never to YouTube. */
+.crt-video, .crt-video iframe { pointer-events: none; }
 .crt-video iframe { filter: var(--vfilter, none); }
 .crt-video .cv-layer { position: absolute; inset: 0; pointer-events: none; }
 .crt-video .cv-scan { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, var(--scan-a)) 0 1px, transparent 1px var(--scan-p)); }

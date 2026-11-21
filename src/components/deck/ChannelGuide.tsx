@@ -7,6 +7,10 @@ import type { Lang } from "../../lib/store";
 export function ChannelGuide({ onPick }: { onPick?: () => void }) {
   const groupId = useStore((s) => s.groupId);
   const favourites = useStore((s) => s.favourites);
+  const customGroups = useStore((s) => s.customGroups);
+  const [naming, setNaming] = useState<null | { mode: "new" } | { mode: "rename"; id: string }>(null);
+  const [nameDraft, setNameDraft] = useState("");
+  const current = groupId.startsWith("custom:") ? customGroups.find((g) => `custom:${g.id}` === groupId) : undefined;
   const onAir = useStore((s) => s.cells);
   const lang = useStore((s) => s.lang);
   const t = useT();
@@ -14,7 +18,7 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
   const query = useDeferredValue(q.trim().toLowerCase());
 
   const rows = useMemo(() => {
-    const keys = query ? [...CHANNEL_BY_KEY.keys()] : groupKeysOf({ groupId, favourites });
+    const keys = query ? [...CHANNEL_BY_KEY.keys()] : groupKeysOf({ groupId, favourites, customGroups });
     return keys
       .map((k) => CHANNEL_BY_KEY.get(k)!)
       .filter(
@@ -28,25 +32,94 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
           c.districtZh.includes(query),
       )
       .slice(0, 400);
-  }, [query, groupId, favourites]);
+  }, [query, groupId, favourites, customGroups]);
+
+  const other = (lang === "zh" ? "en" : "zh") as Lang;
+  const section = (sec: string) => GROUPS.filter((g) => g.section === sec);
+  const opt = (g: (typeof GROUPS)[number], indent = false) => (
+    <option key={g.id} value={g.id}>
+      {indent ? "\u00a0\u00a0\u00a0" : ""}
+      {groupLabel(g, lang)} · {groupLabel(g, other)} ({g.keys.length})
+    </option>
+  );
+  const submitName = () => {
+    const name = nameDraft.trim();
+    if (!name || !naming) return setNaming(null);
+    if (naming.mode === "new") {
+      const id = actions.createGroup(name);
+      actions.loadGroup(`custom:${id}`);
+    } else actions.renameGroup(naming.id, name);
+    setNaming(null);
+  };
 
   return (
     <section className="guide" aria-label={t.guide}>
       <div className="guide-head">
         <label className="field">
           <span>{t.cameraGroup}</span>
-          <select value={groupId} onChange={(e) => actions.loadGroup(e.target.value)}>
-            <option value="favourites">
-              {t.favourites} ({favourites.length})
-            </option>
-            {GROUPS.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.id.startsWith("district:") ? "   " : ""}
-                {groupLabel(g, lang)} · {groupLabel(g, (lang === "zh" ? "en" : "zh") as Lang)} ({g.keys.length})
-              </option>
-            ))}
-          </select>
+          <span className="group-pick">
+            <select value={groupId} onChange={(e) => actions.loadGroup(e.target.value)}>
+              <optgroup label={t.myGroups}>
+                <option value="favourites">
+                  {t.favourites} ({favourites.length})
+                </option>
+                {customGroups.map((g) => (
+                  <option key={g.id} value={`custom:${g.id}`}>
+                    ◆ {g.name} ({g.keys.length})
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label={t.topics}>{section("topic").map((g) => opt(g))}</optgroup>
+              <optgroup label={t.feedTypes}>{section("type").map((g) => opt(g))}</optgroup>
+              <optgroup label={t.regions}>
+                {GROUPS.filter((g) => g.section === "region" || g.section === "district").map((g) => opt(g, g.section === "district"))}
+              </optgroup>
+            </select>
+            <button
+              type="button"
+              className="icon-btn"
+              title={t.newGroup}
+              aria-label={t.newGroup}
+              onClick={() => {
+                setNameDraft("");
+                setNaming({ mode: "new" });
+              }}
+            >
+              +
+            </button>
+          </span>
         </label>
+        {naming && (
+          <form
+            className="group-name"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitName();
+            }}
+          >
+            <input autoFocus className="search" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder={t.groupName} aria-label={t.groupName} onKeyDown={(e) => e.key === "Escape" && setNaming(null)} />
+            <button type="submit" className="btn">
+              {naming.mode === "new" ? t.create : t.save}
+            </button>
+          </form>
+        )}
+        {current && !naming && (
+          <div className="group-tools">
+            <button
+              type="button"
+              className="link"
+              onClick={() => {
+                setNameDraft(current.name);
+                setNaming({ mode: "rename", id: current.id });
+              }}
+            >
+              {t.rename}
+            </button>
+            <button type="button" className="link danger" onClick={() => window.confirm(t.deleteConfirm.replace("{name}", current.name)) && actions.deleteGroup(current.id)}>
+              {t.delete}
+            </button>
+          </div>
+        )}
         <input className="search" type="search" placeholder={t.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t.searchLabel} />
       </div>
       <ul className="guide-list">
@@ -79,7 +152,7 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
             </li>
           );
         })}
-        {rows.length === 0 && <li className="empty">{t.noMatch}</li>}
+        {rows.length === 0 && <li className="empty">{current && !query ? t.emptyGroup : t.noMatch}</li>}
       </ul>
     </section>
   );

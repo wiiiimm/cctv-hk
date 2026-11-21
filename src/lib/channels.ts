@@ -26,6 +26,8 @@ export interface ChannelGroup {
   id: string;
   label: string;
   labelZh: string;
+  /** Where it is listed in the group picker. */
+  section: "type" | "topic" | "region" | "district" | "custom";
   keys: string[];
 }
 
@@ -91,7 +93,28 @@ function build(): Channel[] {
   return out;
 }
 
-export const CHANNELS: Channel[] = build();
+/**
+ * Weather cameras and located live streams take the district / region of the nearest traffic camera, so they join
+ * the location groups (TD cameras cover all 18 districts). Feeds without a location keep their own labels.
+ */
+function locate(channels: Channel[]): Channel[] {
+  const td = channels.filter((c) => c.kind === "td" && c.geo);
+  return channels.map((c) => {
+    if (c.kind === "td" || !c.geo) return c;
+    let best = td[0];
+    let bestD = Infinity;
+    for (const t of td) {
+      const d = (t.geo!.lat - c.geo.lat) ** 2 + ((t.geo!.lon - c.geo.lon) * Math.cos((c.geo.lat * Math.PI) / 180)) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = t;
+      }
+    }
+    return { ...c, region: best.region, regionZh: best.regionZh, district: best.district, districtZh: best.districtZh };
+  });
+}
+
+export const CHANNELS: Channel[] = locate(build());
 export const CHANNEL_BY_KEY = new Map(CHANNELS.map((c) => [c.key, c]));
 export const CHANNEL_BY_NUM = new Map(CHANNELS.map((c) => [c.num, c]));
 
@@ -129,30 +152,77 @@ function featured(): string[] {
   return [...used];
 }
 
+/** Built-in themes that mix traffic, weather and live feeds. `match` hits English TD camera names. */
+const TOPICS: { id: string; label: string; labelZh: string; keys: string[]; match?: RegExp; where?: (c: Channel) => boolean }[] = [
+  {
+    // The islands themselves: Peng Chau, Cheung Chau, Lamma and south / west Lantau. No North Lantau road cameras.
+    id: "islands",
+    label: "Islands Watch",
+    labelZh: "離島觀察",
+    keys: ["hko:PE2", "hko:DNL", "hko:CCH", "hko:CCE", "hko:LAM", "hko:SLW", "hko:CS1", "hko:CS2"],
+  },
+  {
+    // Lantau: south / west weather cameras plus the North Lantau roads, Lantau Link and Sunny Bay.
+    id: "lantau",
+    label: "Lantau",
+    labelZh: "大嶼山",
+    keys: ["hko:SLW", "hko:CS1", "hko:CS2"],
+    match: /Lantau Link|Sunny Bay/,
+    where: (c) => c.kind === "td" && c.district === "Islands" && !/HZMB/.test(c.name),
+  },
+  {
+    id: "harbour",
+    label: "Victoria Harbour",
+    labelZh: "維多利亞港",
+    keys: ["hko:HK2", "hko:HKO", "hko:IC1", "hko:IC2", "hko:CP1", "hko:HMM", "hko:DNL", "hko:SWH", "yt:XN-ArdUrqtc", "yt:6YYmUo2TgJ0", "yt:jmwM1hA3JE0", "yt:Fwr8lBTaBtE"],
+    match: /Cross Harbour|Western Harbour|Eastern Harbour|Harbour Road|Gloucester Road|Connaught Road/,
+  },
+  {
+    id: "peak",
+    label: "Peak & skyline",
+    labelZh: "山頂及天際線",
+    keys: ["hko:VPA", "hko:VPB", "hko:GSI", "hko:HK2", "hko:IC1", "hko:IC2", "hko:KLT", "yt:TIYZVyzOk4k", "yt:WkcmApaOvWc", "yt:O1oQhMlBiOA", "yt:6YYmUo2TgJ0"],
+  },
+  {
+    id: "airport",
+    label: "Airport & HZMB",
+    labelZh: "機場及港珠澳大橋",
+    keys: ["yt:ygC5wni2DMQ", "yt:JPREngCARsA"],
+    match: /HZMB|TM-CLK/,
+  },
+  { id: "tunnels", label: "Tunnels", labelZh: "隧道", keys: [], match: /Tunnel/ },
+  { id: "bridges", label: "Bridges", labelZh: "橋樑", keys: [], match: /Bridge|Tsing Ma|Ting Kau|Stonecutters|Kap Shui Mun|Lantau Link/ },
+  { id: "border", label: "Border crossings", labelZh: "邊境口岸", keys: [], match: /Shenzhen Bay|Heung Yuen Wai|HZMB|Man Kam To|Lok Ma Chau|Lo Wu|San Tin/ },
+  {
+    id: "coast",
+    label: "Islands & coast",
+    labelZh: "離島及海岸",
+    keys: ["hko:CCH", "hko:CCE", "hko:LAM", "hko:PE2", "hko:DNL", "hko:WGL", "hko:WL2", "hko:CS1", "hko:CS2", "hko:SLW", "hko:LFS", "hko:WLP", "hko:KS2", "hko:SKG", "hko:SK2", "hko:CWB", "hko:CWA", "hko:TPK"],
+  },
+];
+
 function buildGroups(): ChannelGroup[] {
+  const keysOf = (list: Channel[]) => list.map((c) => c.key);
   const groups: ChannelGroup[] = [
-    { id: "featured", label: "Featured", labelZh: "精選", keys: featured() },
-    { id: "all", label: "All channels", labelZh: "所有頻道", keys: CHANNELS.map((c) => c.key) },
-    { id: "kind:yt", label: "Live video", labelZh: "直播影像", keys: CHANNELS.filter((c) => c.kind === "yt").map((c) => c.key) },
-    { id: "kind:hko", label: "HKO weather", labelZh: "天文台天氣", keys: CHANNELS.filter((c) => c.kind === "hko").map((c) => c.key) },
+    { id: "featured", section: "type", label: "Featured", labelZh: "精選", keys: featured() },
+    { id: "all", section: "type", label: "All channels", labelZh: "所有頻道", keys: keysOf(CHANNELS) },
+    { id: "kind:yt", section: "type", label: "Live video", labelZh: "直播影像", keys: keysOf(CHANNELS.filter((c) => c.kind === "yt")) },
+    { id: "kind:hko", section: "type", label: "HKO weather", labelZh: "天文台天氣", keys: keysOf(CHANNELS.filter((c) => c.kind === "hko")) },
+    { id: "kind:td", section: "type", label: "Traffic", labelZh: "交通", keys: keysOf(CHANNELS.filter((c) => c.kind === "td")) },
   ];
+  for (const t of TOPICS) {
+    const matched = CHANNELS.filter((c) => (t.match && c.kind === "td" && t.match.test(c.name)) || t.where?.(c)).map((c) => c.key);
+    const keys = [...new Set([...t.keys.filter((k) => CHANNEL_BY_KEY.has(k)), ...matched])];
+    if (keys.length) groups.push({ id: `topic:${t.id}`, section: "topic", label: t.label, labelZh: t.labelZh, keys });
+  }
+  // Location groups hold every located feed (traffic, weather and live) in that region / district.
   for (const region of REGION_ORDER) {
-    const inRegion = CHANNELS.filter((c) => c.kind === "td" && c.region === region);
-    groups.push({
-      id: `region:${region}`,
-      label: `${region} traffic`,
-      labelZh: `${inRegion[0]?.regionZh ?? region}交通`,
-      keys: inRegion.map((c) => c.key),
-    });
+    const inRegion = CHANNELS.filter((c) => c.region === region);
+    groups.push({ id: `region:${region}`, section: "region", label: region, labelZh: inRegion.find((c) => c.kind === "td")?.regionZh ?? region, keys: keysOf(inRegion) });
     const districts = [...new Set(inRegion.map((c) => c.district))].sort();
     for (const d of districts) {
       const inDistrict = inRegion.filter((c) => c.district === d);
-      groups.push({
-        id: `district:${d}`,
-        label: d,
-        labelZh: inDistrict[0].districtZh,
-        keys: inRegion.filter((c) => c.district === d).map((c) => c.key),
-      });
+      groups.push({ id: `district:${d}`, section: "district", label: d, labelZh: inDistrict[0].districtZh, keys: keysOf(inDistrict) });
     }
   }
   return groups;

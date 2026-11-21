@@ -6,6 +6,12 @@ import { PREVIEW_DEFAULT, PREVIEW_MAX, PREVIEW_MIN, PREVIEW_STEP, liveGeometry, 
 export type Mode = "console" | "crt";
 export type Lang = "en" | "zh";
 
+export interface CustomGroup {
+  id: string;
+  name: string;
+  keys: string[];
+}
+
 export interface State {
   /** Width (CSS px) the user wants each preview (non-pinned video) to be. The wall fills the screen with as many as fit. */
   previewSize: number;
@@ -31,6 +37,8 @@ export interface State {
   crtPreset: string;
   lang: Lang;
   favourites: string[];
+  /** User-made groups; a feed can be in any number of them. Selected as groupId "custom:<id>". */
+  customGroups: CustomGroup[];
   showMap: boolean;
   muted: boolean;
   /** Timestamp of the last channel change, used for static bursts and the channel OSD. */
@@ -42,10 +50,11 @@ export interface State {
 }
 
 const STORAGE_KEY = "cctv-hk:v1";
-const PERSIST: (keyof State)[] = ["previewSize", "pinMode", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "patrolSec", "muted"];
+const PERSIST: (keyof State)[] = ["previewSize", "pinMode", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "customGroups", "patrolSec", "muted"];
 
-function groupKeys(s: Pick<State, "groupId" | "favourites">): string[] {
+function groupKeys(s: Pick<State, "groupId" | "favourites" | "customGroups">): string[] {
   if (s.groupId === "favourites") return s.favourites.length ? s.favourites : GROUP_BY_ID.get("featured")!.keys;
+  if (s.groupId.startsWith("custom:")) return s.customGroups.find((g) => `custom:${g.id}` === s.groupId)?.keys ?? [];
   return GROUP_BY_ID.get(s.groupId)?.keys ?? GROUP_BY_ID.get("featured")!.keys;
 }
 
@@ -75,6 +84,7 @@ function initial(): State {
     crtPreset: "trinitron",
     lang: typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en",
     favourites: [],
+    customGroups: [],
     showMap: true,
     muted: true,
     switchedAt: 0,
@@ -88,6 +98,10 @@ function initial(): State {
     /* storage unavailable: use defaults */
   }
   base.favourites = base.favourites.filter((k) => CHANNEL_BY_KEY.has(k));
+  base.customGroups = (Array.isArray(base.customGroups) ? base.customGroups : [])
+    .filter((g) => g && typeof g.id === "string" && typeof g.name === "string")
+    .map((g) => ({ id: g.id, name: g.name, keys: [...new Set((g.keys ?? []).filter((k) => CHANNEL_BY_KEY.has(k)))] }));
+  if (base.groupId.startsWith("custom:") && !base.customGroups.some((g) => `custom:${g.id}` === base.groupId)) base.groupId = "featured";
   if (!base.pinned) base.focused = false;
   base.previewSize = clampPreview(Number(base.previewSize) || PREVIEW_DEFAULT);
   if (base.pinMode !== "wide" && base.pinMode !== "side") base.pinMode = "side";
@@ -155,6 +169,7 @@ function fillCells(s: State, cells: string[], n: number): string[] {
 }
 
 function stepIn(keys: string[], key: string, dir: number): string {
+  if (!keys.length) return key;
   let i = keys.indexOf(key);
   if (i < 0) {
     // Not in the current group: step through all channels by number instead.
@@ -167,6 +182,13 @@ function stepIn(keys: string[], key: string, dir: number): string {
 
 const smallScreen = () => typeof window !== "undefined" && Math.min(window.innerWidth, window.innerHeight) < 600;
 const clampPreview = (px: number) => Math.max(PREVIEW_MIN, Math.min(PREVIEW_MAX, Math.round(px / PREVIEW_STEP) * PREVIEW_STEP));
+
+/**
+ * How many cells the wall on screen can show (pinned video included), as last reported by the wall. Group
+ * changes size the new wall from this — not from the old group's cell count, which may be smaller.
+ */
+let wallCapacity = 0;
+const capacityOr = (fallback: number) => (wallCapacity > 0 ? wallCapacity : fallback);
 
 /** Typed channel numbers auto-tune after this pause. */
 export const ENTRY_TIMEOUT_MS = 1800;
@@ -185,6 +207,7 @@ export const actions = {
    * continue through the group for new slots, and drop the overflow.
    */
   setCapacity(n: number) {
+    if (n >= 1) wallCapacity = n;
     const s = get();
     if (n < 1 || n === s.cells.length) return;
     // A small group can't fill every slot; don't keep re-asking for more than it has.
@@ -221,7 +244,7 @@ export const actions = {
       const belongs = groupKeys(s).includes(was) && !rest.includes(was);
       const back = Math.min(s.pinFrom, rest.length);
       if (belongs) rest.splice(back, 0, was);
-      const cells = fillCells(s, rest, s.cells.length);
+      const cells = fillCells(s, rest, capacityOr(s.cells.length));
       return { pinned: false, cells, selected: belongs ? back : 0, focused: false, switchedCell: -1 };
     });
   },
@@ -246,11 +269,11 @@ export const actions = {
     update((s) => {
       const keys = groupKeys({ ...s, groupId });
       const pinnedKey = s.pinned ? s.cells[0] : undefined;
+      const n = capacityOr(s.cells.length);
       if (pinnedKey && keys.includes(pinnedKey)) {
-        const previews = pageCells(keys.filter((k) => k !== pinnedKey), 0, Math.max(1, s.cells.length - 1));
+        const previews = pageCells(keys.filter((k) => k !== pinnedKey), 0, Math.max(1, n - 1));
         return { groupId, page: 0, cells: [pinnedKey, ...previews], selected: 0, switchedAt: Date.now(), switchedCell: -1 };
       }
-      const n = s.pinned ? s.cells.length : Math.max(1, s.cells.length);
       return {
         groupId,
         page: 0,
@@ -272,7 +295,7 @@ export const actions = {
       }
       const keys = groupKeys(s);
       const fixed = s.pinned ? 1 : 0; // the pinned video stays; only previews page
-      const n = Math.max(1, s.cells.length - fixed);
+      const n = Math.max(1, capacityOr(s.cells.length) - fixed);
       const pages = Math.max(1, Math.ceil(keys.length / n));
       const page = (s.page + dir + pages) % pages;
       const cells = [...s.cells.slice(0, fixed), ...pageCells(keys, page, n)];
@@ -380,6 +403,29 @@ export const actions = {
   toggleFavourite(key: string) {
     update((s) => ({
       favourites: s.favourites.includes(key) ? s.favourites.filter((k) => k !== key) : [...s.favourites, key],
+    }));
+  },
+  /** Create a group (optionally starting with one feed) and switch to it. Returns its id. */
+  createGroup(name: string, firstKey?: string) {
+    const id = Date.now().toString(36);
+    const group: CustomGroup = { id, name: name.trim() || "Untitled", keys: firstKey && CHANNEL_BY_KEY.has(firstKey) ? [firstKey] : [] };
+    update((s) => ({ customGroups: [...s.customGroups, group] }));
+    return id;
+  },
+  renameGroup(id: string, name: string) {
+    update((s) => ({ customGroups: s.customGroups.map((g) => (g.id === id ? { ...g, name: name.trim() || g.name } : g)) }));
+  },
+  deleteGroup(id: string) {
+    const wasCurrent = get().groupId === `custom:${id}`;
+    update((s) => ({ customGroups: s.customGroups.filter((g) => g.id !== id) }));
+    if (wasCurrent) actions.loadGroup("featured");
+  },
+  /** Add / remove a feed in one of the user's groups. */
+  toggleInGroup(id: string, key: string) {
+    update((s) => ({
+      customGroups: s.customGroups.map((g) =>
+        g.id !== id ? g : { ...g, keys: g.keys.includes(key) ? g.keys.filter((k) => k !== key) : [...g.keys, key] },
+      ),
     }));
   },
   togglePatrol() {

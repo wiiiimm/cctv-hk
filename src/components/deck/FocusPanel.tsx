@@ -5,6 +5,7 @@ import { chAltName, chDistrict, chName, chRegion, useT } from "../../lib/i18n";
 import { ago, hkStamp, useClock } from "../../hooks/useClock";
 import { MiniMap } from "../MiniMap";
 import { PinModes, PinToggle } from "../PinButtons";
+import { GroupMenu } from "./GroupMenu";
 
 export function FocusPanel({ compact = false }: { compact?: boolean }) {
   const key = useStore(activeKey);
@@ -73,6 +74,7 @@ export function FocusPanel({ compact = false }: { compact?: boolean }) {
         <button type="button" className={`icon-btn${fav ? " on" : ""}`} onClick={() => actions.toggleFavourite(ch.key)} title="*" aria-label={fav ? t.removeFav : t.addFav} aria-pressed={fav}>
           ★
         </button>
+        <GroupMenu chKey={ch.key} />
       </div>
       {ch.geo ? (
         showMap && <MiniMap lat={ch.geo.lat} lon={ch.geo.lon} approx={ch.geo.approx} label={chName(ch, lang)} />

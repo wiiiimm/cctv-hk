@@ -59,6 +59,7 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
           title={name}
           allow="autoplay; encrypted-media; picture-in-picture"
           referrerPolicy="strict-origin-when-cross-origin"
+          tabIndex={-1}
         />
       ) : snap.url && !noSignal ? (
         <img className="tile-media" src={snap.url} alt={name} draggable={false} />

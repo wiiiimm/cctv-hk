@@ -26,6 +26,10 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   (same rule when restoring saved state). The wall never shows a channel twice.
 - No right sidebar. The selected (or pinned) video's details + map sit at the top of the left sidebar
   (`components/deck/Sidebar.tsx`), above the channel guide. Theatre mode (`T`) hides the whole sidebar.
+- Camera groups (`buildGroups` in `lib/channels.ts`): feed types, topic groups (`TOPICS`: curated keys + TD-name regex /
+  predicate, e.g. Islands Watch, Lantau), and location groups. Weather cameras and located YouTube streams take the
+  district/region of the nearest TD camera (`locate`), so location groups mix all feed types. Users can also make
+  their own groups (`customGroups`, groupId "custom:<id>"); a feed may be in any number of groups.
 - Pin / single-view controls are one component and one style everywhere (`components/PinButtons.tsx`, `.icon-btn`):
   neutral = available action, yellow "on" = active for that video.
 - The sidebar remote (`components/deck/Remote.tsx`) shares direct channel entry with the keyboard: the store owns
