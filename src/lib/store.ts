@@ -197,6 +197,10 @@ function stepIn(keys: string[], key: string, dir: number): string {
   return keys[(i + dir + keys.length) % keys.length];
 }
 
+/** Typed channel numbers auto-tune after this pause. */
+export const ENTRY_TIMEOUT_MS = 1800;
+let entryTimer: ReturnType<typeof setTimeout> | undefined;
+
 export const actions = {
   /** Choose the grid. A pinned video stays pinned, in the new grid's pinned variant. */
   setLayout(gridCols: number, gridRows: number) {
@@ -297,15 +301,27 @@ export const actions = {
     });
   },
   tune(num: number) {
+    clearTimeout(entryTimer);
     const ch = CHANNEL_BY_NUM.get(num);
     if (ch) actions.assign(get().selected, ch.key);
     update({ entry: "" });
     return !!ch;
   },
+  /** Direct channel entry (keyboard digits and the remote's number pad). Auto-tunes after a pause. */
   typeDigit(d: string) {
     update((s) => ({ entry: (s.entry + d).slice(-4) }));
+    clearTimeout(entryTimer);
+    entryTimer = setTimeout(actions.commitEntry, ENTRY_TIMEOUT_MS);
+  },
+  /** Tune to the typed number now (Enter / OK). Returns false if nothing was being typed. */
+  commitEntry() {
+    const entry = get().entry;
+    if (!entry) return false;
+    actions.tune(Number(entry));
+    return true;
   },
   clearEntry() {
+    clearTimeout(entryTimer);
     update({ entry: "" });
   },
   select(i: number) {

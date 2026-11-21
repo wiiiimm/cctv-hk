@@ -4,6 +4,7 @@ import { actions, activeKey, useStore } from "../../lib/store";
 import { chAltName, chDistrict, chName, chRegion, useT } from "../../lib/i18n";
 import { ago, hkStamp, useClock } from "../../hooks/useClock";
 import { MiniMap } from "../MiniMap";
+import { PinToggle, SoloToggle } from "../PinButtons";
 
 export function FocusPanel({ compact = false }: { compact?: boolean }) {
   const key = useStore(activeKey);
@@ -67,12 +68,8 @@ export function FocusPanel({ compact = false }: { compact?: boolean }) {
       <div className="panel-actions">
         <button type="button" onClick={() => actions.channelStep(-1)} title="PgDn / −">{t.chDown}</button>
         <button type="button" onClick={() => actions.channelStep(1)} title="PgUp / +">{t.chUp}</button>
-        <button type="button" className={`primary${pinnedHere ? " on" : ""}`} onClick={() => (pinnedHere ? actions.unpin() : actions.pin())} title={t.pinTitle}>
-          {pinnedHere ? t.unpin : t.pinVideo}
-        </button>
-        <button type="button" className={focused ? "on" : ""} onClick={() => (focused ? actions.unfocus() : actions.focus())} title={t.soloTitle}>
-          {focused ? t.backToWall : t.soloBtn}
-        </button>
+        <PinToggle />
+        <SoloToggle />
         <button type="button" className={fav ? "on" : ""} onClick={() => actions.toggleFavourite(ch.key)} title="*" aria-label={fav ? t.removeFav : t.addFav}>
           ★
         </button>

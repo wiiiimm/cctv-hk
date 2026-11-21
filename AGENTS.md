@@ -21,6 +21,10 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   `slots()` in `lib/layout.ts` is the single source of slot geometry for the DOM wall, the CRT compositor and click mapping.
 - No right sidebar. The selected (or pinned) video's details + map sit at the top of the left sidebar
   (`components/deck/Sidebar.tsx`), above the channel guide. Theatre mode (`T`) hides the whole sidebar.
+- Pin / single-view controls are one component and one style everywhere (`components/PinButtons.tsx`, `.icon-btn`):
+  neutral = available action, yellow "on" = active for that video.
+- The sidebar remote (`components/deck/Remote.tsx`) shares direct channel entry with the keyboard: the store owns
+  `entry` and the auto-tune timer (`typeDigit` / `commitEntry` / `clearEntry`); keyboard presses light the matching key.
 - CRT power on/off is a timed sequence (`powerOn` / `powerOff` in `lib/crt/renderer.ts`). In dev, set
   `window.__crtFx = { on: true, t: 0.2 }` to freeze a moment for inspection. GLSL: never call smoothstep with descending edges.
 - i18n: `lib/i18n.ts` (en / zh-Hant). Primary language leads; the other language shows as secondary info wherever there is room.

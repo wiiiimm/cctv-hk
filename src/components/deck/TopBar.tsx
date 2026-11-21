@@ -3,6 +3,7 @@ import { PRESETS } from "../../lib/crt/presets";
 import { slots } from "../../lib/layout";
 import { useT } from "../../lib/i18n";
 import { hkDate, hkTime, useClock } from "../../hooks/useClock";
+import { PinToggle } from "../PinButtons";
 
 function LayoutIcon({ c, r, sp }: { c: number; r: number; sp: number }) {
   return (
@@ -42,9 +43,7 @@ export function TopBar({ onGuide }: { onGuide: () => void }) {
             </button>
           );
         })}
-        <button type="button" className={`pill pin${pinned ? " on" : ""}`} onClick={actions.togglePin} title={t.pinTitle} aria-pressed={pinned}>
-          {pinned ? `● ${t.pinned}` : t.pin}
-        </button>
+        <PinToggle />
       </div>
 
       <div className="tb-group" role="group" aria-label={t.patrol}>

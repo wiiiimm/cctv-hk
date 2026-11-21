@@ -268,7 +268,7 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
   if (now - v.presetAt < 2500) text(ctx, v.presetLabel.toUpperCase(), w / 2, h - my - big * 1.8, big * 0.8, "#7CFF6B", "center");
   if (v.patrol) text(ctx, DICTS[v.lang].seq, mx + big * 0.5, h - my - big * 1.3, big * 0.7, "#7CFF6B");
 
-  // Map inset on the pinned video (solo, or the big slot of a pinned layout): top-right, under its status badge.
+  // Map inset on the pinned video (solo, or the big slot of a pinned layout): top-left, under the channel label.
   const pinnedRect = v.single ? rects.get(v.selected) : v.span > 1 ? rects.get(0) : undefined;
   const pinnedCh = v.single ? active : v.span > 1 ? CHANNEL_BY_KEY.get(v.cells[0]) : undefined;
   if (pinnedRect && v.showMap && pinnedCh?.geo) {
@@ -278,8 +278,8 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
     const fsCap = 18 * v.scale;
     ctx.save();
     ctx.globalAlpha = 0.65;
-    // Badge: right edge at cellX + cellW - pad (pad = 0.45·fs), bottom ≈ top + 1.8·fs.
-    drawMap(ctx, pinnedCh.geo.lat, pinnedCh.geo.lon, pinnedCh.geo.approx, cellX + cellW - mw - fsCap * 0.45, cellY + fsCap * 2.2, mw, mh, now);
+    // Channel label: left edge at cellX + pad (pad = 0.45·fs), bottom ≈ top + 1.8·fs.
+    drawMap(ctx, pinnedCh.geo.lat, pinnedCh.geo.lon, pinnedCh.geo.approx, cellX + fsCap * 0.45, cellY + fsCap * 2.2, mw, mh, now);
     ctx.restore();
   }
   return rects;

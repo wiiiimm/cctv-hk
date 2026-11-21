@@ -12,7 +12,6 @@ export { cyclePreset };
 export function useControls() {
   // Keyboard
   useEffect(() => {
-    let entryTimer: ReturnType<typeof setTimeout> | undefined;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.closest("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -21,18 +20,12 @@ export function useControls() {
       let handled = true;
       if (/^[0-9]$/.test(e.key)) {
         actions.typeDigit(e.key);
-        clearTimeout(entryTimer);
-        entryTimer = setTimeout(() => {
-          const entry = store.get().entry;
-          if (entry) actions.tune(Number(entry));
-        }, 1800);
       } else
         switch (e.key) {
           case "Enter":
           case " ":
-            if (s.entry) {
-              clearTimeout(entryTimer);
-              actions.tune(Number(s.entry));
+            if (actions.commitEntry()) {
+              /* tuned */
             } else if (s.focused) actions.unfocus();
             else actions.escalate();
             break;
@@ -115,7 +108,6 @@ export function useControls() {
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
-      clearTimeout(entryTimer);
     };
   }, []);
 
