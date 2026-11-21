@@ -25,7 +25,8 @@ export interface ScreenView {
   presetLabel: string;
   presetAt: number;
   patrol: boolean;
-  hideMedia: boolean;
+  /** Cells covered by a real YouTube player in the DOM: drawn without a picture (OSD only). */
+  videoCells: number[];
   lang: Lang;
   /** Canvas pixels per CSS pixel, so OSD text matches the DOM wall's sizes. */
   scale: number;
@@ -254,7 +255,7 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
     rects.set(ci, r);
     const big = v.single || (v.pinned && ci === 0);
     const highlight = !v.single && ci === v.selected && !big;
-    drawCell(ctx, v.cells[ci], r.x, r.y, r.w, r.h, now, big, v.hideMedia && v.single, v.lang, v.scale, highlight);
+    drawCell(ctx, v.cells[ci], r.x, r.y, r.w, r.h, now, big, v.videoCells.includes(ci), v.lang, v.scale, highlight);
     if (highlight) drawSelection(ctx, r, v.scale);
   });
 

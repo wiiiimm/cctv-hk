@@ -3,13 +3,47 @@ import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed } from "../../lib/channels";
 import { retain, useSnap } from "../../lib/snapshots";
 import { actions, store, useStore } from "../../lib/store";
 import { drawScreen } from "../../lib/crt/compositor";
-import { fitWall } from "../../lib/layout";
 import { arrange, publishGeometry, type PinMode, type Rect } from "../../lib/arrange";
 import { CrtRenderer, ON, powerOff, powerOn } from "../../lib/crt/renderer";
 import { crtInset, presetById } from "../../lib/crt/presets";
 import { chName, useT } from "../../lib/i18n";
 import { powerThunk, staticBurst } from "../../lib/audio";
 import { PinControls } from "../monitor/PinControls";
+
+/**
+ * A live YouTube stream can't be drawn into WebGL, so it plays as a real player over its own CRT tile
+ * (CSS scanline / mask / vignette on top). Renders nothing until the stream is known to be live.
+ */
+function CrtYouTube({ chKey, rect, muted, big }: { chKey: string; rect: Rect; muted: boolean; big: boolean }) {
+  const ch = CHANNEL_BY_KEY.get(chKey);
+  const snap = useSnap(ch, big);
+  const lang = useStore((s) => s.lang);
+  const t = useT();
+  if (!ch || ch.kind !== "yt" || !snap.live) return null;
+  return (
+    <div className={`crt-video${big ? " big" : ""}`} style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
+      <iframe src={youtubeEmbed(ch.code, muted)} title={chName(ch, lang)} allow="autoplay; encrypted-media" referrerPolicy="strict-origin-when-cross-origin" />
+      <div className="crt-video-fx" />
+      <div className="crt-video-osd">
+        <span>
+          CH {fmtNum(ch.num)} {t.stLive}
+        </span>
+        {big && <span>{chName(ch, lang)}</span>}
+      </div>
+    </div>
+  );
+}
+
+/** Which cells play live YouTube in CRT mode — the same rule as the DOM wall. */
+function videoCells(s: { cells: string[]; pinned: boolean; focused: boolean; selected: number }, shown: number): number[] {
+  if (s.focused) return CHANNEL_BY_KEY.get(s.cells[s.selected])?.kind === "yt" ? [s.selected] : [];
+  const out: number[] = [];
+  for (let i = 0; i < Math.min(shown, s.cells.length); i++) {
+    if (CHANNEL_BY_KEY.get(s.cells[i])?.kind !== "yt") continue;
+    if ((s.pinned && i === 0) || s.cells.length <= 4) out.push(i);
+  }
+  return out;
+}
 
 /** The CRT wall arrangement in CSS px of the tube (same engine as the DOM wall, inside the safe-area inset). */
 function crtLayout(w: number, h: number, s: { previewSize: number; pinned: boolean; pinMode: PinMode; focused: boolean; crtPreset: string }): Rect[] {
@@ -43,11 +77,8 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
     previewSize: useStore((s) => s.previewSize),
     pinMode: useStore((s) => s.pinMode),
   };
-  const t = useT();
   const visible = single ? [cells[selected]] : cells;
   const activeCh = CHANNEL_BY_KEY.get(cells[selected]);
-  const activeSnap = useSnap(single ? activeCh : undefined, true);
-  const ytLive = single && activeCh?.kind === "yt" && activeSnap.live;
 
   // Keep every visible feed polling while it is on screen.
   const visibleSig = visible.join("|");
@@ -135,7 +166,6 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
 
       const preset = presetById(s.crtPreset);
       const isSingle = s.focused || s.cells.length === 1;
-      const ch = CHANNEL_BY_KEY.get(s.cells[s.selected]);
       const rects = drawScreen(
         ctx,
         src.width,
@@ -154,7 +184,8 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
           presetLabel: s.lang === "zh" ? preset.labelZh : preset.label,
           presetAt,
           patrol: s.patrol,
-          hideMedia: isSingle && ch?.kind === "yt",
+          // Tiles that play a real YouTube player on top are left blank on the canvas.
+          videoCells: videoCells(s, Number.MAX_SAFE_INTEGER),
           lang: s.lang,
           inset: crtInset(preset.curvature),
           scale: src.width / Math.max(1, wrap.clientWidth),
@@ -199,11 +230,6 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   };
 
 
-  // A live YouTube stream can't go through WebGL; it plays in the focused 4:3 cell with CSS-only CRT effects.
-  const inset = crtInset(presetById(preset).curvature);
-  const cell = fitWall(size.w * (1 - inset * 2), size.h * (1 - inset * 2), 1, 1, 0);
-  cell.x += size.w * inset;
-  cell.y += size.h * inset;
   // Pin controls float over the selected tile (PIN) or the pinned video (SOLO / UNPIN), matching the CRT geometry.
   const rects = size.w > 0 ? crtLayout(size.w, size.h, { ...pin, crtPreset: preset }) : [];
   let controls: { role: "selected" | "pinned" | "solo"; index: number; x: number; y: number; w: number; h: number } | null = null;
@@ -226,18 +252,12 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   return (
     <div className={`crt-tube${fallback ? " no-gl" : ""}`} ref={wrapRef} onClick={(e) => onPointer(e, false)} onDoubleClick={(e) => onPointer(e, true)}>
       <div ref={hostRef} className="crt-host" role="img" aria-label={activeCh ? `CH ${fmtNum(activeCh.num)} ${chName(activeCh, lang)}` : "CRT"} />
-      {ytLive && activeCh && (
-        <div className="crt-video" style={{ left: cell.x, top: cell.y, width: cell.wallW, height: cell.wallH }}>
-          <iframe src={youtubeEmbed(activeCh.code, muted)} title={chName(activeCh, lang)} allow="autoplay; encrypted-media" referrerPolicy="strict-origin-when-cross-origin" />
-          <div className="crt-video-fx" />
-          <div className="crt-video-osd">
-            <span>
-              CH {fmtNum(activeCh.num)} {t.stLive}
-            </span>
-            <span>{chName(activeCh, lang)}</span>
-          </div>
-        </div>
-      )}
+      {videoCells({ cells, pinned: pin.pinned, focused: pin.focused, selected }, rects.length).map((i) => {
+        const rect = pin.focused ? rects[0] : rects[i];
+        if (!rect) return null;
+        const big = pin.focused || (pin.pinned && i === 0);
+        return <CrtYouTube key={`${cells[i]}-${i}`} chKey={cells[i]} rect={rect} big={big} muted={muted || !(big || i === selected)} />;
+      })}
       <div className="crt-glass" />
       {controls && (
         <div className={`crt-pin-anchor ${controls.role}`} style={{ left: controls.x, top: controls.y, width: controls.w, height: controls.h }}>

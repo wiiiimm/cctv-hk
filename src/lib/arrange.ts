@@ -5,7 +5,7 @@
 // - Pinned: previews form one regular grid and the pinned video covers a square block of cells, so every
 //   preview is the same size and aligned.
 //   - "side": block top-left, leaving a column of previews on its right and a row below (classic 1+N).
-//   - "wide": block as wide as fits while leaving a row below; centred, previews fill either side.
+//   - "wide": the pinned tile spans the full width; previews sit only in rows below it.
 // - Solo ("full"): one fitted 4:3 picture.
 //
 // Rect index i is the wall's cell i (cell 0 = the pinned video when pinned). The number of rects is the
@@ -75,19 +75,18 @@ export function arrange(a: ArrangeInput): Arrangement {
     return { rects: rects.length ? rects : fillBox(0, 0, w, h, Math.min(w, h) / 2, gap), kind: "grid" };
   }
 
-  // Pinned: one regular grid of equal previews; the pinned video covers a span×span block of cells
-  // (4:3, since every cell is 4:3), so the previews beside and below it are the same size and aligned.
-  const side = a.pinMode === "side";
+  if (a.pinMode === "wide") return wideLayout(w, h, p, gap);
+
+  // Side: one regular grid of equal previews; the pinned video covers a span×span block of cells top-left
+  // (4:3, since every cell is 4:3), so the column beside it and the row below are the same size and aligned.
   let q = p;
   let g = gridFor(w, h, q, gap);
   // Too few cells for a block plus previews: shrink the previews until it works.
-  const need = (gg: { cols: number; rows: number }) => (side ? Math.min(gg.cols, gg.rows) >= 3 : gg.cols >= 2 && gg.rows >= 3);
-  while (!need(g) && q > 48) {
+  while (Math.min(g.cols, g.rows) < 3 && q > 48) {
     q *= 0.9;
     g = gridFor(w, h, q, gap);
   }
-  const span = Math.max(1, side ? Math.min(g.cols - 1, g.rows - 1) : Math.min(g.cols, g.rows - 1));
-  const startCol = side ? 0 : Math.floor((g.cols - span) / 2);
+  const span = Math.max(1, Math.min(g.cols - 1, g.rows - 1));
   const f = fitWall(w, h, g.cols, g.rows, gap);
   const cell = (c: number, r: number, n = 1): Rect => ({
     x: f.x + gap + c * (f.cellW + gap),
@@ -95,13 +94,32 @@ export function arrange(a: ArrangeInput): Arrangement {
     w: n * f.cellW + (n - 1) * gap,
     h: n * f.cellH + (n - 1) * gap,
   });
-  const rects: Rect[] = [cell(startCol, 0, span)];
+  const rects: Rect[] = [cell(0, 0, span)];
   for (let r = 0; r < g.rows; r++)
-    for (let c = 0; c < g.cols; c++) {
-      const inBlock = r < span && c >= startCol && c < startCol + span;
-      if (!inBlock) rects.push(cell(c, r));
-    }
-  return { rects, kind: side ? "side" : "wide" };
+    for (let c = 0; c < g.cols; c++) if (!(r < span && c < span)) rects.push(cell(c, r));
+  return { rects, kind: "side" };
+}
+
+/**
+ * Wide: the pinned tile always spans the full width, with previews only in rows below it (never beside it).
+ * On tall stages it is a full-width 4:3 and the leftover height becomes as many preview rows as fit; on wide
+ * stages it keeps one preview row and the picture letterboxes inside the tile.
+ */
+function wideLayout(w: number, h: number, p: number, gap: number): Arrangement {
+  const cols = Math.max(1, Math.floor((w - gap) / (p + gap)));
+  const cellW = (w - gap * (cols + 1)) / cols;
+  const cellH = cellW / CELL_ASPECT;
+  const fullW = w - gap * 2;
+  const maxBigH = fullW / CELL_ASPECT; // never taller than a full-width 4:3 picture
+  // At least one preview row; on tall stages, as many rows as fit under a full-width 4:3 picture.
+  let rows = Math.max(1, Math.floor((h - gap * 2 - Math.min(maxBigH, h * 0.6)) / (cellH + gap)));
+  while (rows > 1 && h - gap * 2 - rows * (cellH + gap) < Math.min(maxBigH, h * 0.4)) rows--;
+  const bigH = Math.max(40, Math.min(maxBigH, h - gap * 2 - rows * (cellH + gap)));
+  const rects: Rect[] = [{ x: gap, y: gap, w: fullW, h: bigH }];
+  const top = gap + bigH + gap;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) rects.push({ x: gap + c * (cellW + gap), y: top + r * (cellH + gap), w: cellW, h: cellH });
+  return { rects, kind: "wide" };
 }
 
 /** Columns × rows of ~previewW 4:3 cells that fit in w×h. */
