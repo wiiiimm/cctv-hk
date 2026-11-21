@@ -1,0 +1,25 @@
+---
+import App from "../components/App";
+// Pixel CJK face for camera OSD text (VT323 has no Chinese glyphs). OFL-1.1, unicode-range subsets.
+import "@fontsource/fusion-pixel-12px-monospaced-tc";
+import "../styles/global.css";
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0c0f" />
+    <meta name="description" content="Channel-surf Hong Kong's public traffic, weather and live cameras like a security control room — with an optional colour CRT monitor." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://tdcctv.data.one.gov.hk" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500&family=VT323&display=swap" rel="stylesheet" />
+    <title>HK CCTV · 香港閉路電視</title>
+  </head>
+  <body>
+    <App client:only="react" />
+    <noscript>HK CCTV needs JavaScript to tune into camera feeds.</noscript>
+  </body>
+</html>
