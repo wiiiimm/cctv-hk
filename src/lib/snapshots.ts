@@ -61,6 +61,30 @@ function probeLive(id: string): Promise<boolean> {
   });
 }
 
+/**
+ * Whether YouTube will actually play this video in an embed. oEmbed answers 401/403/404/400 for videos that
+ * are removed, private, or have embedding disabled ("Video unavailable"). Network failures count as playable
+ * so a flaky connection never takes a stream off air.
+ */
+async function embeddable(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`);
+    return ![400, 401, 403, 404].includes(res.status);
+  } catch {
+    return true;
+  }
+}
+
+/** Streams the player itself reported as unavailable, kept off air for a while even if the thumbnail is live. */
+const unavailableUntil = new Map<string, number>();
+const UNAVAILABLE_MS = 10 * 60_000;
+
+/** Called when an embedded player reports "Video unavailable" (error 100 / 101 / 150 …). */
+export function markUnavailable(key: string) {
+  unavailableUntil.set(key, Date.now() + UNAVAILABLE_MS);
+  set(key, { live: false, status: "offline" });
+}
+
 async function load(key: string) {
   const e = entries.get(key);
   const ch = CHANNEL_BY_KEY.get(key);
@@ -69,7 +93,10 @@ async function load(key: string) {
   let next: number = POLL_MS[ch.kind];
   try {
     if (ch.kind === "yt") {
-      const [live] = await Promise.all([probeLive(ch.code), e.snap.url ? Promise.resolve() : fetchInto(key, src!)]);
+      // Off air = not broadcasting (no live thumbnail), or YouTube won't play it here ("Video unavailable").
+      const [onAir, canEmbed] = await Promise.all([probeLive(ch.code), embeddable(ch.code), e.snap.url ? Promise.resolve() : fetchInto(key, src!)]);
+      const blocked = (unavailableUntil.get(key) ?? 0) > Date.now();
+      const live = onAir && canEmbed && !blocked;
       set(key, { live, status: live ? "ok" : "offline" });
     } else {
       await fetchInto(key, bust(src!));

@@ -1,29 +1,66 @@
 import { useEffect, useRef, useState } from "react";
 import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed } from "../../lib/channels";
-import { retain, useSnap } from "../../lib/snapshots";
+import { getSnap, retain, useSnap } from "../../lib/snapshots";
 import { actions, store, useStore } from "../../lib/store";
 import { drawScreen } from "../../lib/crt/compositor";
 import { arrange, publishGeometry, type PinMode, type Rect } from "../../lib/arrange";
 import { CrtRenderer, ON, powerOff, powerOn } from "../../lib/crt/renderer";
-import { crtInset, presetById } from "../../lib/crt/presets";
+import { crtInset, presetById, videoFilter, type CrtPreset } from "../../lib/crt/presets";
+import "./crt-video.css";
 import { chName, useT } from "../../lib/i18n";
 import { powerThunk, staticBurst } from "../../lib/audio";
 import { PinControls } from "../monitor/PinControls";
+import { useYouTubeErrors } from "../../hooks/useYouTubeErrors";
+
+/** CSS variables that recreate a picture mode's look on top of a YouTube player. */
+function videoLook(p: CrtPreset): React.CSSProperties {
+  const [r, g, b] = p.tint.map((c) => Math.round(Math.min(1, c) * 255));
+  return {
+    ["--vfilter" as string]: videoFilter(p),
+    ["--scan-a" as string]: String(0.12 + p.scanline * 0.4),
+    ["--scan-p" as string]: p.scanCount > 420 ? "2px" : "3px",
+    ["--mask-a" as string]: String(p.maskStrength * 0.6),
+    ["--vig" as string]: String(p.vignette),
+    ["--noise" as string]: String(Math.min(0.45, p.noise * 2.5)),
+    ["--roll" as string]: String(Math.min(0.8, p.roll * 4)),
+    ["--flicker" as string]: String(Math.min(0.2, p.flicker * 2.5)),
+    ["--tint" as string]: `rgb(${r} ${g} ${b})`,
+  };
+}
 
 /**
- * A live YouTube stream can't be drawn into WebGL, so it plays as a real player over its own CRT tile
- * (CSS scanline / mask / vignette on top). Renders nothing until the stream is known to be live.
+ * A live YouTube stream can't be drawn into WebGL, so it plays as a real player over its own CRT tile, with a
+ * CSS version of the current picture mode on top (colour grade, scanlines, mask, vignette, grain, hum bar,
+ * flicker, sweep) and a static burst when this tile changes channel. Renders nothing until the stream is live.
  */
-function CrtYouTube({ chKey, rect, muted, big }: { chKey: string; rect: Rect; muted: boolean; big: boolean }) {
+function CrtYouTube({ chKey, rect, muted, big, preset, switchedAt }: { chKey: string; rect: Rect; muted: boolean; big: boolean; preset: CrtPreset; switchedAt: number }) {
   const ch = CHANNEL_BY_KEY.get(chKey);
   const snap = useSnap(ch, big);
   const lang = useStore((s) => s.lang);
   const t = useT();
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  useYouTubeErrors(frameRef, chKey, !!ch && ch.kind === "yt" && !!snap.live);
+  const [burst, setBurst] = useState(false);
+  useEffect(() => {
+    if (!switchedAt || Date.now() - switchedAt > 400) return;
+    setBurst(true);
+    const tm = setTimeout(() => setBurst(false), 280);
+    return () => clearTimeout(tm);
+  }, [switchedAt]);
   if (!ch || ch.kind !== "yt" || !snap.live) return null;
   return (
-    <div className={`crt-video${big ? " big" : ""}`} style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
-      <iframe src={youtubeEmbed(ch.code, muted)} title={chName(ch, lang)} allow="autoplay; encrypted-media" referrerPolicy="strict-origin-when-cross-origin" />
-      <div className="crt-video-fx" />
+    <div className={`crt-video${big ? " big" : ""}`} style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ...videoLook(preset) }}>
+      <iframe ref={frameRef} src={youtubeEmbed(ch.code, muted)} title={chName(ch, lang)} allow="autoplay; encrypted-media" referrerPolicy="strict-origin-when-cross-origin" />
+      {preset.mono > 0 && <div className="cv-layer cv-glow" />}
+      <div className="cv-layer cv-scan" />
+      {preset.mask === 1 && <div className="cv-layer cv-grille" />}
+      {(preset.mask === 2 || preset.mask === 3) && <div className="cv-layer cv-dots" />}
+      {preset.noise > 0.04 && <div className="cv-layer cv-noise" />}
+      {preset.roll > 0 && <div className="cv-layer cv-roll" />}
+      {preset.flicker > 0.015 && <div className="cv-layer cv-flicker" />}
+      {preset.sweep > 0 && <div className="cv-layer cv-sweep" />}
+      <div className="cv-layer cv-vignette" />
+      {burst && <div className="cv-layer cv-static" />}
       <div className="crt-video-osd">
         <span>
           CH {fmtNum(ch.num)} {t.stLive}
@@ -34,14 +71,15 @@ function CrtYouTube({ chKey, rect, muted, big }: { chKey: string; rect: Rect; mu
   );
 }
 
-/** Which cells play live YouTube in CRT mode — the same rule as the DOM wall. */
+/**
+ * Cells that play a live YouTube player in CRT mode — every visible YouTube tile that is actually live. Off-air /
+ * unavailable streams are left to the canvas, which draws the OFF AIR screen like any other dead feed.
+ */
 function videoCells(s: { cells: string[]; pinned: boolean; focused: boolean; selected: number }, shown: number): number[] {
-  if (s.focused) return CHANNEL_BY_KEY.get(s.cells[s.selected])?.kind === "yt" ? [s.selected] : [];
+  const isLiveYt = (key: string) => CHANNEL_BY_KEY.get(key)?.kind === "yt" && !!getSnap(key).live;
+  if (s.focused) return isLiveYt(s.cells[s.selected]) ? [s.selected] : [];
   const out: number[] = [];
-  for (let i = 0; i < Math.min(shown, s.cells.length); i++) {
-    if (CHANNEL_BY_KEY.get(s.cells[i])?.kind !== "yt") continue;
-    if ((s.pinned && i === 0) || s.cells.length <= 4) out.push(i);
-  }
+  for (let i = 0; i < Math.min(shown, s.cells.length); i++) if (isLiveYt(s.cells[i])) out.push(i);
   return out;
 }
 
@@ -71,6 +109,8 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   const muted = useStore((s) => s.muted);
   const lang = useStore((s) => s.lang);
   const preset = useStore((s) => s.crtPreset);
+  const switchedAt = useStore((s) => s.switchedAt);
+  const switchedCell = useStore((s) => s.switchedCell);
   const pin = {
     pinned: useStore((s) => s.pinned),
     focused: useStore((s) => s.focused),
@@ -256,7 +296,10 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
         const rect = pin.focused ? rects[0] : rects[i];
         if (!rect) return null;
         const big = pin.focused || (pin.pinned && i === 0);
-        return <CrtYouTube key={`${cells[i]}-${i}`} chKey={cells[i]} rect={rect} big={big} muted={muted || !(big || i === selected)} />;
+        const hit = switchedCell === -1 || switchedCell === i;
+        return (
+          <CrtYouTube key={`${cells[i]}-${i}`} chKey={cells[i]} rect={rect} big={big} muted={muted || !big} preset={presetById(preset)} switchedAt={hit ? switchedAt : 0} />
+        );
       })}
       <div className="crt-glass" />
       {controls && (

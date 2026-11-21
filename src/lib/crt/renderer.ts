@@ -22,6 +22,8 @@ uniform float uYs, uXs, uOver, uWash, uHold, uWobble, uDot;
 // Channel-change static is confined to this rectangle (x0, y0, x1, y1 in picture uv).
 uniform vec4 uStaticRect;
 uniform float uSwitch;
+// Phosphor sweep beam (night P7): a bright line crawling down with a decaying afterglow trail.
+uniform float uSweep;
 uniform vec3 uTint;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -114,6 +116,12 @@ void main() {
   col = (col - 0.5) * uCon + 0.5;
   col *= uBri;
   if (uMono > 0.5) col = vec3(luma(col)) * uTint;
+  if (uSweep > 0.0) {
+    float beam = fract(uTime / 3.2);
+    float behind = fract(beam - uv.y);
+    col += uTint * uSweep * (exp(-behind * 14.0) * 0.35 + step(behind, 0.004) * 0.4);
+    col *= 1.0 - uSweep * 0.18 * smoothstep(0.0, 0.9, behind);
+  }
 
   // Scanlines: thinner on bright lines, as a real beam blooms.
   float s = 0.5 + 0.5 * cos(6.28318 * uv.y * uScanCount);
@@ -160,7 +168,7 @@ void main() {
 const UNIFORMS = [
   "uRes", "uTime", "uCurv", "uScan", "uScanCount", "uMask", "uMaskStr", "uMaskScale", "uAberr", "uBloom", "uBleed",
   "uNoise", "uVig", "uSat", "uCon", "uBri", "uFlicker", "uRoll", "uJitter", "uMono", "uStatic", "uTint", "uTex",
-  "uYs", "uXs", "uOver", "uWash", "uHold", "uWobble", "uDot", "uStaticRect", "uSwitch",
+  "uYs", "uXs", "uOver", "uWash", "uHold", "uWobble", "uDot", "uStaticRect", "uSwitch", "uSweep",
 ] as const;
 type U = (typeof UNIFORMS)[number];
 
@@ -295,6 +303,7 @@ export class CrtRenderer {
     f("uMono", p.mono);
     f("uStatic", fx.static);
     f("uSwitch", sw);
+    f("uSweep", p.sweep);
     gl.uniform4f(this.u.uStaticRect, ...rect);
     f("uYs", fx.ys);
     f("uXs", fx.xs);

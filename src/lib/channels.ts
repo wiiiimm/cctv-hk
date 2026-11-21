@@ -182,6 +182,9 @@ export function youtubeEmbed(id: string, muted: boolean): string {
     modestbranding: "1",
     rel: "0",
     iv_load_policy: "3",
+    // Lets the page hear the player's error events (see useYouTubeErrors).
+    enablejsapi: "1",
+    origin: typeof location !== "undefined" ? location.origin : "",
   });
   return `https://www.youtube-nocookie.com/embed/${id}?${q}`;
 }

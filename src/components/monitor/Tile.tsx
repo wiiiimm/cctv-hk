@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useRef } from "react";
 import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed } from "../../lib/channels";
 import { useSnap } from "../../lib/snapshots";
 import { actions, store, useStore } from "../../lib/store";
@@ -6,6 +6,7 @@ import { chAltName, chName, useT } from "../../lib/i18n";
 import { PinControls, type PinRole } from "./PinControls";
 import { ago, hkStamp, useClock } from "../../hooks/useClock";
 import "./osd.css";
+import { useYouTubeErrors } from "../../hooks/useYouTubeErrors";
 
 interface Props {
   /** Which pin controls to show on this tile, if any. */
@@ -24,6 +25,9 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
   const now = useClock();
   const t = useT();
   const lang = useStore((s) => s.lang);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const willPlay = ch?.kind === "yt" && allowVideo && !!snap.live;
+  useYouTubeErrors(frameRef, channelKey, willPlay);
   if (!ch) return <div className="tile" />;
 
   const isVideo = ch.kind === "yt";
@@ -49,6 +53,7 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
     >
       {playing ? (
         <iframe
+          ref={frameRef}
           className="tile-media"
           src={youtubeEmbed(ch.code, muted)}
           title={name}

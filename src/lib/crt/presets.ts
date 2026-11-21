@@ -1,4 +1,5 @@
-// Full-colour CRT looks. Every value feeds a uniform in shader.ts.
+// CRT looks. Every numeric value feeds a uniform in renderer.ts; `videoFilter` (plus the numbers) drives the
+// CSS-only version of the same look that sits on top of YouTube players, which WebGL can't draw.
 export interface CrtPreset {
   id: string;
   label: string;
@@ -30,6 +31,10 @@ export interface CrtPreset {
   jitter: number;
   mono: number;
   tint: [number, number, number];
+  /** Slow phosphor sweep beam (night P7), 0..1. */
+  sweep: number;
+  /** CSS filter that grades a YouTube player to match (CSS filters apply to iframes). */
+  videoFilter?: string;
 }
 
 const base: Omit<CrtPreset, "id" | "label" | "labelZh"> = {
@@ -52,6 +57,7 @@ const base: Omit<CrtPreset, "id" | "label" | "labelZh"> = {
   jitter: 0,
   mono: 0,
   tint: [1, 1, 1],
+  sweep: 0,
 };
 
 export const PRESETS: CrtPreset[] = [
@@ -133,8 +139,81 @@ export const PRESETS: CrtPreset[] = [
     jitter: 0.3,
     mono: 1,
     tint: [0.86, 1.0, 0.94],
+    videoFilter: "grayscale(1) sepia(0.12) hue-rotate(70deg) contrast(1.25) brightness(1.08)",
+  },
+  // Monochrome phosphor tubes (after the sibling cctv-hk project's presets).
+  {
+    ...base,
+    id: "green-p1",
+    label: "Green P1 phosphor", labelZh: "綠色 P1 螢光",
+    curvature: 0.05,
+    scanline: 0.5,
+    scanCount: 360,
+    mask: 0,
+    maskStrength: 0,
+    aberration: 0,
+    bloom: 0.6,
+    noise: 0.06,
+    vignette: 0.6,
+    saturation: 0,
+    contrast: 1.2,
+    brightness: 1.05,
+    flicker: 0.02,
+    mono: 1,
+    tint: [0.41, 1.0, 0.54],
+    videoFilter: "grayscale(1) sepia(1) hue-rotate(78deg) saturate(2.9) contrast(1.18) brightness(0.92)",
+  },
+  {
+    ...base,
+    id: "amber-p3",
+    label: "Amber P3 phosphor", labelZh: "琥珀色 P3 螢光",
+    curvature: 0.05,
+    scanline: 0.5,
+    scanCount: 360,
+    mask: 0,
+    maskStrength: 0,
+    aberration: 0,
+    bloom: 0.6,
+    noise: 0.06,
+    vignette: 0.6,
+    saturation: 0,
+    contrast: 1.2,
+    brightness: 1.05,
+    flicker: 0.02,
+    mono: 1,
+    tint: [1.0, 0.82, 0.49],
+    videoFilter: "grayscale(1) sepia(1) hue-rotate(-14deg) saturate(3.2) contrast(1.18) brightness(0.94)",
+  },
+  {
+    ...base,
+    id: "night-p7",
+    label: "Night P7 (sweep)", labelZh: "夜視 P7（掃描）",
+    curvature: 0.06,
+    scanline: 0.45,
+    scanCount: 360,
+    mask: 0,
+    maskStrength: 0,
+    aberration: 0,
+    bloom: 0.7,
+    noise: 0.1,
+    vignette: 0.7,
+    saturation: 0,
+    contrast: 1.3,
+    brightness: 1.0,
+    flicker: 0.02,
+    mono: 1,
+    tint: [0.72, 0.96, 0.26],
+    sweep: 1,
+    videoFilter: "grayscale(1) sepia(1) hue-rotate(48deg) saturate(2.5) contrast(1.3) brightness(0.92)",
   },
 ];
+
+/** CSS filter for a YouTube player under this look (explicit, or derived from the colour grade). */
+export function videoFilter(p: CrtPreset): string {
+  if (p.videoFilter) return p.videoFilter;
+  const blur = p.bleed > 0.5 ? " blur(0.6px)" : p.bleed > 0 ? " blur(0.3px)" : "";
+  return `saturate(${p.saturation}) contrast(${p.contrast}) brightness(${p.brightness})${blur}`;
+}
 
 /** Margin (fraction per side) that keeps picture content clear of the curved, vignetted tube edge. */
 export const crtInset = (curvature: number) => 0.012 + curvature * 0.35;

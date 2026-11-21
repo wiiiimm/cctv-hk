@@ -49,9 +49,10 @@ function groupKeys(s: Pick<State, "groupId" | "favourites">): string[] {
   return GROUP_BY_ID.get(s.groupId)?.keys ?? GROUP_BY_ID.get("featured")!.keys;
 }
 
+/** One page of the group: n channels from page·n, wrapping round, but never showing a channel twice. */
 function pageCells(keys: string[], page: number, n: number): string[] {
   const out: string[] = [];
-  for (let i = 0; i < n; i++) out.push(keys[(page * n + i) % keys.length]);
+  for (let i = 0; i < Math.min(n, keys.length); i++) out.push(keys[(page * n + i) % keys.length]);
   return out;
 }
 
@@ -90,9 +91,16 @@ function initial(): State {
   if (!base.pinned) base.focused = false;
   base.previewSize = clampPreview(Number(base.previewSize) || PREVIEW_DEFAULT);
   if (base.pinMode !== "wide" && base.pinMode !== "side") base.pinMode = "side";
+  // Restore the saved wall, but only previews that belong to the current group (no duplicates). A pinned video
+  // (cell 0) is kept even if it's from another group — it was pinned on purpose.
+  const groupSet = new Set(groupKeys(base));
+  const saved = base.cells.filter((k) => CHANNEL_BY_KEY.has(k));
+  const pinnedKey = base.pinned ? saved[0] : undefined;
+  const previews = [...new Set(saved.slice(base.pinned ? 1 : 0))].filter((k) => groupSet.has(k) && k !== pinnedKey);
+  base.cells = pinnedKey ? [pinnedKey, ...previews] : previews;
+  if (!pinnedKey) base.pinned = base.focused = false;
   // Until the wall reports how many previews fit, start with a screenful's worth from the group.
-  base.cells = base.cells.filter((k) => CHANNEL_BY_KEY.has(k));
-  if (!base.cells.length) base.cells = pageCells(groupKeys(base), base.page, 12);
+  if (base.cells.length < 2) base.cells = [...base.cells, ...pageCells(groupKeys(base), base.page, 12).filter((k) => k !== pinnedKey)];
   return base;
 }
 
@@ -131,15 +139,17 @@ export function useStore<T>(pick: (s: State) => T): T {
 
 export const groupKeysOf = groupKeys;
 
-/** Resize the cell list to `n`: keep what is on screen, then continue through the group. */
+/**
+ * Resize the cell list to `n`: keep what is on screen, then continue through the group. A channel is never
+ * shown twice; if the group runs out, the remaining slots stay empty.
+ */
 function fillCells(s: State, cells: string[], n: number): string[] {
   const keys = groupKeys(s);
-  const out = cells.slice(0, n);
+  const out = [...new Set(cells)].slice(0, n);
   let i = Math.max(0, keys.indexOf(out[out.length - 1]) + 1);
-  while (out.length < n) {
+  for (let tries = 0; out.length < n && tries < keys.length; tries++) {
     const k = keys[i++ % keys.length];
-    // Avoid repeating a camera already on the wall when the group is big enough.
-    if (!out.includes(k) || keys.length <= n || i > keys.length * 2) out.push(k);
+    if (!out.includes(k)) out.push(k);
   }
   return out;
 }
@@ -177,6 +187,8 @@ export const actions = {
   setCapacity(n: number) {
     const s = get();
     if (n < 1 || n === s.cells.length) return;
+    // A small group can't fill every slot; don't keep re-asking for more than it has.
+    if (n > s.cells.length && fillCells(s, s.cells, n).length === s.cells.length) return;
     update((st) => {
       const cells = fillCells(st, st.cells, n);
       return { cells, selected: Math.min(st.selected, n - 1) };
@@ -198,14 +210,19 @@ export const actions = {
       return { pinned: true, pinFrom: at, cells: [picked, ...cells], selected: 0, focused: false, switchedCell: 0, switchedAt: Date.now() };
     });
   },
-  /** Back to a wall of previews, with the pinned video returned to where it came from. */
+  /**
+   * Back to a wall of previews. The pinned video returns to where it came from — but only if it belongs to the
+   * group now on screen and isn't already showing; otherwise it is dropped and the wall refills from the group.
+   */
   unpin() {
     update((s) => {
       if (!s.pinned) return {};
-      const back = Math.min(s.pinFrom, s.cells.length - 1);
-      const rest = s.cells.slice(1);
-      rest.splice(back, 0, s.cells[0]);
-      return { pinned: false, cells: rest, selected: back, focused: false, switchedCell: -1 };
+      const [was, ...rest] = s.cells;
+      const belongs = groupKeys(s).includes(was) && !rest.includes(was);
+      const back = Math.min(s.pinFrom, rest.length);
+      if (belongs) rest.splice(back, 0, was);
+      const cells = fillCells(s, rest, s.cells.length);
+      return { pinned: false, cells, selected: belongs ? back : 0, focused: false, switchedCell: -1 };
     });
   },
   /** Choose how the pinned video is shown: "wide", "side", or "full" (only the pinned video). Pins the selection if needed. */

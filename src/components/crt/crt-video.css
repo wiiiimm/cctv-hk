@@ -1,0 +1,21 @@
+/* CSS-only CRT look for YouTube players (WebGL can't draw them). Driven per picture mode by CSS variables set in
+   CrtYouTube: --scan-a/--scan-p (scanline darkness / pitch), --mask-a, --vig, --noise, --roll, --flicker, --tint. */
+.crt-video iframe { filter: var(--vfilter, none); }
+.crt-video .cv-layer { position: absolute; inset: 0; pointer-events: none; }
+.crt-video .cv-scan { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, var(--scan-a)) 0 1px, transparent 1px var(--scan-p)); }
+.crt-video .cv-grille { opacity: var(--mask-a); mix-blend-mode: multiply; background: repeating-linear-gradient(90deg, #ff5a5a 0 1px, #5aff5a 1px 2px, #5a7bff 2px 3px); }
+.crt-video .cv-dots { opacity: var(--mask-a); mix-blend-mode: multiply; background: radial-gradient(circle, #ff6b6b 0.6px, transparent 0.9px) 0 0 / 3px 3px, radial-gradient(circle, #6bff6b 0.6px, transparent 0.9px) 1px 1.5px / 3px 3px, radial-gradient(circle, #6b8bff 0.6px, transparent 0.9px) 2px 0 / 3px 3px, #333; }
+.crt-video .cv-glow { mix-blend-mode: screen; opacity: 0.12; background: radial-gradient(circle at 50% 48%, var(--tint) 0%, transparent 72%); }
+.crt-video .cv-vignette { box-shadow: inset 0 0 calc(30px + 70px * var(--vig)) calc(4px + 14px * var(--vig)) rgba(0, 0, 0, 0.8); background: linear-gradient(155deg, rgba(255, 255, 255, 0.05), transparent 28%); }
+.crt-video .cv-noise { opacity: var(--noise); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-size: 140px 140px; mix-blend-mode: overlay; animation: cvNoise 0.12s steps(2) infinite; }
+.crt-video .cv-roll { opacity: var(--roll); background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.35) 8%, transparent 18%) 0 0 / 100% 250% no-repeat; mix-blend-mode: overlay; animation: cvRoll 6s linear infinite; }
+.crt-video .cv-flicker { background: #fff; mix-blend-mode: overlay; animation: cvFlicker 0.09s steps(2) infinite; opacity: var(--flicker); }
+.crt-video .cv-sweep { inset: auto 0; height: 18%; background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--tint) 18%, transparent) 60%, color-mix(in srgb, var(--tint) 45%, white 20%) 96%, transparent 100%); animation: cvSweep 3.2s linear infinite; }
+.crt-video .cv-static { opacity: 0.85; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-size: 140px 140px; filter: contrast(2.2) brightness(1.3); animation: cvNoise 0.06s steps(2) infinite; }
+@keyframes cvNoise { 0% { background-position: 0 0; } 50% { background-position: 40px -25px; } 100% { background-position: -30px 35px; } }
+@keyframes cvRoll { from { background-position: 0 -150%; } to { background-position: 0 250%; } }
+@keyframes cvFlicker { 0% { opacity: 0; } 50% { opacity: var(--flicker); } }
+@keyframes cvSweep { from { top: -20%; } to { top: 105%; } }
+@media (prefers-reduced-motion: reduce) {
+  .crt-video .cv-noise, .crt-video .cv-roll, .crt-video .cv-flicker, .crt-video .cv-sweep, .crt-video .cv-static { animation: none; }
+}

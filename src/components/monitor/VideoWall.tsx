@@ -33,7 +33,6 @@ export function VideoWall() {
   });
 
   const shown = solo ? [selected] : cells.map((_, i) => i).slice(0, layout.rects.length);
-  const allowVideo = solo || cells.length <= 4;
 
   return (
     <div className={`wall-area wall-${layout.kind}`} ref={ref}>
@@ -51,8 +50,9 @@ export function VideoWall() {
                 // The pinned (big) video needs no selection highlight; previews still get one.
                 selected={!solo && i === selected && !big}
                 large={big}
-                allowVideo={allowVideo || big}
-                muted={muted || !(solo || i === selected)}
+                // Live YouTube autoplays everywhere; previews are always muted, only the pinned / full video has sound.
+                allowVideo
+                muted={muted || !big}
               />
             </div>
           );
