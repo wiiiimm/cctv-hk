@@ -33,11 +33,12 @@ export function useControls() {
             if (s.entry) {
               clearTimeout(entryTimer);
               actions.tune(Number(s.entry));
-            } else actions.toggleFocus();
+            } else if (s.focused) actions.unfocus();
+            else actions.escalate();
             break;
           case "Escape":
             if (s.entry) actions.clearEntry();
-            else actions.unfocus();
+            else actions.deescalate();
             break;
           case "Backspace":
             actions.clearEntry();
@@ -85,6 +86,10 @@ export function useControls() {
           case "v":
           case "V":
             cyclePreset(e.shiftKey ? -1 : 1);
+            break;
+          case "t":
+          case "T":
+            actions.toggleTheater();
             break;
           case "g":
           case "G":
@@ -153,8 +158,8 @@ export function useControls() {
         if (hit(13)) single ? actions.channelStep(-1) : actions.moveSelection(0, 1);
         if (hit(14)) single ? actions.channelStep(-1) : actions.moveSelection(-1, 0);
         if (hit(15)) single ? actions.channelStep(1) : actions.moveSelection(1, 0);
-        if (hit(0)) actions.toggleFocus();
-        if (hit(1)) actions.unfocus();
+        if (hit(0)) (s.focused ? actions.unfocus() : actions.escalate());
+        if (hit(1)) actions.deescalate();
         if (hit(2)) actions.cycleLayout(1);
         if (hit(3)) actions.toggleMap();
         if (hit(4)) actions.channelStep(-1);

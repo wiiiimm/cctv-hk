@@ -14,6 +14,15 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   shader (`lib/crt/presets.ts` holds the looks). Keep curvature gentle; the compositor insets the wall so nothing clips.
   YouTube can't be drawn into WebGL, so a focused live stream is an iframe over the canvas with CSS-only CRT effects.
 - Cells are 4:3 (`lib/layout.ts`), matching TD's 320×240 snapshots; 16:9 feeds letterbox, never crop.
+- Layout = the user's grid (`gridCols×gridRows`) plus a pin level: grid → pinned → solo (`focused`). Pinning puts the
+  video in cell 0 of the grid's pinned variant (`pinnedLayout`: 3×3→1+5, 4×3→1+8, 4×4→1+7, 5×4/6×6→1+11); grids smaller
+  than 3×3 (2×2, 3×2) pin straight to solo. The 1×1 button is the solo pin. Enter/double-click step up, Esc steps down;
+  clicking a small tile while pinned pins it instead. Unpinning returns the video to its original cell (`pinFrom`).
+  `slots()` in `lib/layout.ts` is the single source of slot geometry for the DOM wall, the CRT compositor and click mapping.
+- No right sidebar. The selected (or pinned) video's details + map sit at the top of the left sidebar
+  (`components/deck/Sidebar.tsx`), above the channel guide. Theatre mode (`T`) hides the whole sidebar.
+- CRT power on/off is a timed sequence (`powerOn` / `powerOff` in `lib/crt/renderer.ts`). In dev, set
+  `window.__crtFx = { on: true, t: 0.2 }` to freeze a moment for inspection. GLSL: never call smoothstep with descending edges.
 - i18n: `lib/i18n.ts` (en / zh-Hant). Primary language leads; the other language shows as secondary info wherever there is room.
   Feed OSD font is VT323 for Latin + Fusion Pixel 12px Monospaced TC (OFL, `@fontsource`) for Chinese.
 - `src/pages/api/snap.ts` — same-origin relay for HKO photos (no CORS upstream). Allow-listed station codes only.

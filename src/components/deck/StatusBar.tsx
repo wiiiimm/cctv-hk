@@ -6,7 +6,7 @@ export function StatusBar() {
   const s = useStore((x) => x);
   const t = useT();
   const keys = groupKeysOf(s);
-  const n = s.cols * s.rows;
+  const n = s.cells.length;
   const pages = Math.max(1, Math.ceil(keys.length / n));
   const g = GROUP_BY_ID.get(s.groupId);
   const group = s.groupId === "favourites" ? t.favourites : g ? groupLabel(g, s.lang) : "";
@@ -14,7 +14,7 @@ export function StatusBar() {
   return (
     <footer className="statusbar">
       <span>
-        {t.group} <b>{group}</b> · {t.page} <b>{(s.page % pages) + 1}/{pages}</b> · {s.cols}×{s.rows}
+        {t.group} <b>{group}</b> · {t.page} <b>{(s.page % pages) + 1}/{pages}</b> · {s.gridCols}×{s.gridRows}{s.focused ? ` · ${t.solo}` : s.pinned ? ` · ${t.pinned} 1+${s.cells.length - 1}` : ""}
       </span>
       {s.entry && (
         <span className="entry">

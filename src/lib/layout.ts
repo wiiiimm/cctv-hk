@@ -25,3 +25,37 @@ export function fitWall(w: number, h: number, cols: number, rows: number, gap: n
   const wallH = cellH * rows + gap * (rows + 1);
   return { cellW, cellH, wallW, wallH, x: (w - wallW) / 2, y: (h - wallH) / 2 };
 }
+
+/** One wall position in grid units. Slot 0 of a spotlight layout is the large one. */
+export interface Slot {
+  col: number;
+  row: number;
+  span: number;
+}
+
+/**
+ * Positions for a cols×rows unit grid. With `span` > 1 the first slot is a span×span spotlight in the
+ * top-left and the remaining units fill in reading order (e.g. 3×3 span 2 = the classic "1+5").
+ */
+export function slots(cols: number, rows: number, span = 0): Slot[] {
+  const big = span > 1 ? Math.min(span, cols, rows) : 0;
+  const out: Slot[] = big ? [{ col: 0, row: 0, span: big }] : [];
+  for (let row = 0; row < rows; row++)
+    for (let col = 0; col < cols; col++) {
+      if (big && col < big && row < big) continue;
+      out.push({ col, row, span: 1 });
+    }
+  return out;
+}
+
+export const slotCount = (cols: number, rows: number, span = 0) => slots(cols, rows, span).length;
+
+/** Pixel rectangle of a slot inside a fitted wall. */
+export function slotRect(fit: WallFit, s: Slot, gap: number) {
+  return {
+    x: fit.x + gap + s.col * (fit.cellW + gap),
+    y: fit.y + gap + s.row * (fit.cellH + gap),
+    w: s.span * fit.cellW + (s.span - 1) * gap,
+    h: s.span * fit.cellH + (s.span - 1) * gap,
+  };
+}

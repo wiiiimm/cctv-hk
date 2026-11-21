@@ -1,11 +1,14 @@
 import { memo } from "react";
 import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed } from "../../lib/channels";
 import { useSnap } from "../../lib/snapshots";
-import { actions, useStore } from "../../lib/store";
+import { actions, store, useStore } from "../../lib/store";
 import { chAltName, chName, useT } from "../../lib/i18n";
+import { PinControls, type PinRole } from "./PinControls";
 import { ago, hkStamp, useClock } from "../../hooks/useClock";
 
 interface Props {
+  /** Which pin controls to show on this tile, if any. */
+  pinRole?: PinRole;
   index: number;
   channelKey: string;
   selected: boolean;
@@ -14,7 +17,7 @@ interface Props {
   muted: boolean;
 }
 
-export const Tile = memo(function Tile({ index, channelKey, selected, large, allowVideo, muted }: Props) {
+export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, large, allowVideo, muted }: Props) {
   const ch = CHANNEL_BY_KEY.get(channelKey);
   const snap = useSnap(ch, large);
   const now = useClock();
@@ -31,8 +34,9 @@ export const Tile = memo(function Tile({ index, channelKey, selected, large, all
   return (
     <div
       className={`tile${selected ? " selected" : ""}${large ? " large" : ""}`}
-      onClick={() => actions.select(index)}
-      onDoubleClick={() => actions.toggleFocus()}
+      // Pinned: clicking a small tile pins it instead. Double-click steps up a pin level (solo toggles back).
+      onClick={() => (store.get().pinned && !store.get().focused ? actions.pin(index) : actions.select(index))}
+      onDoubleClick={() => (store.get().focused ? actions.unfocus() : actions.escalate(index))}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         const key = e.dataTransfer.getData("text/x-channel");
@@ -90,6 +94,16 @@ export const Tile = memo(function Tile({ index, channelKey, selected, large, all
         </>
       )}
       {isVideo && !playing && snap.live && <div className="tile-play">▶</div>}
+      {pinRole && <PinControls role={pinRole} index={index} />}
+      {/* Selection indicator: drawn above the picture (an outline on the tile itself sits underneath it). */}
+      {selected && (
+        <div className="tile-sel" aria-hidden>
+          <i />
+          <i />
+          <i />
+          <i />
+        </div>
+      )}
     </div>
   );
 });

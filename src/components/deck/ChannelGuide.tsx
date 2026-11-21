@@ -31,7 +31,7 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
   }, [query, groupId, favourites]);
 
   return (
-    <aside className="guide" aria-label={t.guide}>
+    <section className="guide" aria-label={t.guide}>
       <div className="guide-head">
         <label className="field">
           <span>{t.cameraGroup}</span>
@@ -81,6 +81,6 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
         })}
         {rows.length === 0 && <li className="empty">{t.noMatch}</li>}
       </ul>
-    </aside>
+    </section>
   );
 }

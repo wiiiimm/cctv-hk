@@ -1,22 +1,23 @@
-import { useState } from "react";
-import { LAYOUTS, actions, useStore } from "../../lib/store";
+import { LAYOUTS, actions, hasPinnedVariant, pinnedLayout, useStore } from "../../lib/store";
 import { PRESETS } from "../../lib/crt/presets";
+import { slots } from "../../lib/layout";
 import { useT } from "../../lib/i18n";
 import { hkDate, hkTime, useClock } from "../../hooks/useClock";
 
-function LayoutIcon({ c, r }: { c: number; r: number }) {
+function LayoutIcon({ c, r, sp }: { c: number; r: number; sp: number }) {
   return (
     <span className="lay-icon" style={{ gridTemplateColumns: `repeat(${c},1fr)`, gridTemplateRows: `repeat(${r},1fr)` }} aria-hidden>
-      {Array.from({ length: Math.min(c * r, 36) }, (_, i) => <i key={i} />)}
+      {slots(c, r, sp).map((s, i) => (
+        <i key={i} className={s.span > 1 ? "big" : ""} style={{ gridColumn: `${s.col + 1} / span ${s.span}`, gridRow: `${s.row + 1} / span ${s.span}` }} />
+      ))}
     </span>
   );
 }
 
 export function TopBar({ onGuide }: { onGuide: () => void }) {
-  const { cols, rows, patrol, patrolSec, showMap, muted, mode, crtPreset, lang } = useStore((s) => s);
+  const { gridCols, gridRows, pinned, focused, patrol, patrolSec, showMap, muted, mode, crtPreset, lang, theater } = useStore((s) => s);
   const t = useT();
   const now = useClock();
-  const [custom, setCustom] = useState(false);
   const crtOn = mode === "crt";
 
   return (
@@ -29,21 +30,21 @@ export function TopBar({ onGuide }: { onGuide: () => void }) {
       </div>
 
       <div className="tb-group" role="group" aria-label={t.layout}>
-        {LAYOUTS.map(([c, r]) => (
-          <button key={`${c}x${r}`} type="button" className={`lay${c === cols && r === rows ? " on" : ""}`} onClick={() => actions.setLayout(c, r)} title={`${c}×${r}`}>
-            <LayoutIcon c={c} r={r} />
-          </button>
-        ))}
-        <button type="button" className={`lay txt${custom ? " on" : ""}`} onClick={() => setCustom((v) => !v)} title={t.custom}>
-          n×m
+        <button type="button" className={`lay${focused ? " on" : ""}`} onClick={() => (focused ? actions.unfocus() : actions.focus())} title={t.soloTitle}>
+          <LayoutIcon c={1} r={1} sp={0} />
         </button>
-        {custom && (
-          <span className="custom-lay">
-            <input type="number" min={1} max={8} value={cols} onChange={(e) => actions.setLayout(clamp(+e.target.value), rows)} aria-label={t.columns} />
-            ×
-            <input type="number" min={1} max={8} value={rows} onChange={(e) => actions.setLayout(cols, clamp(+e.target.value))} aria-label={t.rows} />
-          </span>
-        )}
+        {LAYOUTS.map(([c, r]) => {
+          const [pc, pr, ps] = pinnedLayout(c, r);
+          const on = !focused && c === gridCols && r === gridRows;
+          return (
+            <button key={`${c}x${r}`} type="button" className={`lay${on ? " on" : ""}`} onClick={() => actions.setLayout(c, r)} title={pinned ? `${c}×${r} · ${hasPinnedVariant(c, r) ? `${t.pinned} 1+${slots(pc, pr, ps).length - 1}` : t.solo}` : `${c}×${r}`}>
+              {pinned && hasPinnedVariant(c, r) ? <LayoutIcon c={pc} r={pr} sp={ps} /> : <LayoutIcon c={c} r={r} sp={0} />}
+            </button>
+          );
+        })}
+        <button type="button" className={`pill pin${pinned ? " on" : ""}`} onClick={actions.togglePin} title={t.pinTitle} aria-pressed={pinned}>
+          {pinned ? `● ${t.pinned}` : t.pin}
+        </button>
       </div>
 
       <div className="tb-group" role="group" aria-label={t.patrol}>
@@ -69,6 +70,7 @@ export function TopBar({ onGuide }: { onGuide: () => void }) {
       </div>
 
       <div className="tb-group">
+        <button type="button" className={`pill${theater ? " on" : ""}`} onClick={actions.toggleTheater} title={t.theaterTitle} aria-pressed={theater}>{t.theater}</button>
         <button type="button" className={`pill${showMap ? " on" : ""}`} onClick={actions.toggleMap} title={t.mapTitle}>{t.map}</button>
         <button type="button" className={`pill${!muted ? " on" : ""}`} onClick={actions.toggleMute} title={t.soundTitle}>
           {muted ? t.muted : t.sound}
@@ -87,4 +89,3 @@ export function TopBar({ onGuide }: { onGuide: () => void }) {
   );
 }
 
-const clamp = (n: number) => Math.max(1, Math.min(8, Math.round(n) || 1));
