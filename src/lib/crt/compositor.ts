@@ -6,13 +6,15 @@ import type { Lang } from "../store";
 import { getSnap } from "../snapshots";
 import { DARKEN, TILE, project, tileImage, tileUrl } from "../maptiles";
 import { hkStamp } from "../../hooks/useClock";
-import { fitWall, slotRect, slots } from "../layout";
+import { arrange, type PinMode } from "../arrange";
 
 export interface ScreenView {
   cells: string[];
-  cols: number;
-  rows: number;
-  span: number;
+  /** A video is pinned (cell 0 shown large). */
+  pinned: boolean;
+  pinMode: PinMode;
+  /** User's preview width in CSS px (scaled by `scale` for the canvas). */
+  previewW: number;
   selected: number;
   single: boolean;
   entry: string;
@@ -239,22 +241,18 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
   const rects = new Map<number, CellRect>();
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, w, h);
-  const gap = v.single ? 0 : Math.max(2, Math.round(w / 400));
-  const cols = v.single ? 1 : v.cols;
-  const rows = v.single ? 1 : v.rows;
-  // Fit the 4:3-cell wall inside the safe area; whatever is left over letterboxes.
+  const gap = v.single ? 0 : 3 * v.scale;
+  // Same arrangement as the DOM wall, inside the tube's safe area.
   const mx = w * v.inset;
   const my = h * v.inset;
-  const fit = fitWall(w - mx * 2, h - my * 2, cols, rows, gap);
-  fit.x += mx;
-  fit.y += my;
-  const indices = v.single ? [v.selected] : v.cells.map((_, i) => i);
+  const layout = arrange({ w: w - mx * 2, h: h - my * 2, previewW: v.previewW * v.scale, pinned: v.pinned, pinMode: v.pinMode, solo: v.single, gap });
+  const indices = v.single ? [v.selected] : v.cells.map((_, i) => i).slice(0, layout.rects.length);
 
-  const layout = v.single ? [{ col: 0, row: 0, span: 1 }] : slots(cols, rows, v.span);
   indices.forEach((ci, slot) => {
-    const r = slotRect(fit, layout[slot], gap);
+    const q = layout.rects[slot];
+    const r = { x: q.x + mx, y: q.y + my, w: q.w, h: q.h };
     rects.set(ci, r);
-    const big = v.single || (v.span > 1 && ci === 0);
+    const big = v.single || (v.pinned && ci === 0);
     const highlight = !v.single && ci === v.selected && !big;
     drawCell(ctx, v.cells[ci], r.x, r.y, r.w, r.h, now, big, v.hideMedia && v.single, v.lang, v.scale, highlight);
     if (highlight) drawSelection(ctx, r, v.scale);
@@ -283,8 +281,8 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
   if (v.patrol) text(ctx, DICTS[v.lang].seq, mx + big * 0.5, h - my - big * 1.3, big * 0.7, "#7CFF6B");
 
   // Map inset on the pinned video (solo, or the big slot of a pinned layout): top-left, under the channel label.
-  const pinnedRect = v.single ? rects.get(v.selected) : v.span > 1 ? rects.get(0) : undefined;
-  const pinnedCh = v.single ? active : v.span > 1 ? CHANNEL_BY_KEY.get(v.cells[0]) : undefined;
+  const pinnedRect = v.single ? rects.get(v.selected) : v.pinned ? rects.get(0) : undefined;
+  const pinnedCh = v.single ? active : v.pinned ? CHANNEL_BY_KEY.get(v.cells[0]) : undefined;
   if (pinnedRect && v.showMap && pinnedCh?.geo) {
     const { x: cellX, y: cellY, w: cellW } = pinnedRect;
     const mw = Math.round(cellW * 0.18);

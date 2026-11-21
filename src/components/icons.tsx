@@ -39,3 +39,31 @@ export const ExitSoloIcon = (p: P) => (
     <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
   </Svg>
 );
+
+/** Many small tiles: smaller previews. */
+export const SmallerIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 4h4v4H4zM10 4h4v4h-4zM16 4h4v4h-4zM4 10h4v4H4zM10 10h4v4h-4zM16 10h4v4h-4zM4 16h4v4H4zM10 16h4v4h-4zM16 16h4v4h-4z" />
+  </Svg>
+);
+
+/** Few large tiles: bigger previews. */
+export const BiggerIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
+  </Svg>
+);
+
+/** Pinned "wide": a full-width picture over a row of previews. */
+export const PinWideIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M3 4h18v11H3zM3 18h5v2H3zM10 18h4v2h-4zM16 18h5v2h-5z" />
+  </Svg>
+);
+
+/** Pinned "side": a picture with a column of previews on its right and a row below. */
+export const PinSideIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M3 4h12v10H3zM17 4h4v4h-4zM17 10h4v4h-4zM3 17h4v3H3zM9 17h6v3H9zM17 17h4v3h-4z" />
+  </Svg>
+);

@@ -1,4 +1,4 @@
-import { PinToggle, SoloToggle } from "../PinButtons";
+import { PinModes, PinToggle } from "../PinButtons";
 
 export type PinRole = "selected" | "pinned" | "solo";
 
@@ -8,7 +8,7 @@ export function PinControls({ role, index }: { role: PinRole; index: number }) {
     <div className={`pin-controls ${role}`} onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
       {/* Same order as the sidebar: pin, then single view. */}
       <PinToggle index={role === "selected" ? index : 0} />
-      {role !== "selected" && <SoloToggle />}
+      {role !== "selected" && <PinModes />}
     </div>
   );
 }

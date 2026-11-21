@@ -2,7 +2,7 @@
 // Neutral = an action you can take; "on" (yellow) = that state is active for this video.
 import { actions, useStore } from "../lib/store";
 import { useT } from "../lib/i18n";
-import { ExitSoloIcon, PinIcon, SoloIcon, UnpinIcon } from "./icons";
+import { ExitSoloIcon, PinIcon, PinSideIcon, PinWideIcon, SoloIcon, UnpinIcon } from "./icons";
 
 interface IconButtonProps {
   icon: React.ReactNode;
@@ -55,5 +55,28 @@ export function SoloToggle() {
       on={solo}
       onPress={() => (solo ? actions.unfocus() : actions.focus())}
     />
+  );
+}
+
+/**
+ * The three pinned sizes: wide (full width, previews below), side (previews right + below), full (only the
+ * pinned video). The current one is "on". Choosing one pins the selected video if nothing is pinned yet.
+ */
+export function PinModes() {
+  const t = useT();
+  const pinned = useStore((s) => s.pinned);
+  const solo = useStore((s) => s.focused);
+  const mode = useStore((s) => s.pinMode);
+  return (
+    <span className="pin-modes" role="group" aria-label={t.pinModes}>
+      <IconButton icon={<PinWideIcon />} label={t.pinWide} on={pinned && !solo && mode === "wide"} onPress={() => actions.setPinMode("wide")} />
+      <IconButton icon={<PinSideIcon />} label={t.pinSide} on={pinned && !solo && mode === "side"} onPress={() => actions.setPinMode("side")} />
+      <IconButton
+        icon={solo ? <ExitSoloIcon /> : <SoloIcon />}
+        label={solo ? t.exitSoloTitle : t.soloTitle}
+        on={solo}
+        onPress={() => (solo ? actions.unfocus() : actions.setPinMode("full"))}
+      />
+    </span>
   );
 }

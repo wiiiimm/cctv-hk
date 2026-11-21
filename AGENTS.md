@@ -14,11 +14,14 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   shader (`lib/crt/presets.ts` holds the looks). Keep curvature gentle; the compositor insets the wall so nothing clips.
   YouTube can't be drawn into WebGL, so a focused live stream is an iframe over the canvas with CSS-only CRT effects.
 - Cells are 4:3 (`lib/layout.ts`), matching TD's 320×240 snapshots; 16:9 feeds letterbox, never crop.
-- Layout = the user's grid (`gridCols×gridRows`) plus a pin level: grid → pinned → solo (`focused`). Pinning puts the
-  video in cell 0 of the grid's pinned variant (`pinnedLayout`: 3×3→1+5, 4×3→1+8, 4×4→1+7, 5×4/6×6→1+11); grids smaller
-  than 3×3 (2×2, 3×2) pin straight to solo. The 1×1 button is the solo pin. Enter/double-click step up, Esc steps down;
-  clicking a small tile while pinned pins it instead. Unpinning returns the video to its original cell (`pinFrom`).
-  `slots()` in `lib/layout.ts` is the single source of slot geometry for the DOM wall, the CRT compositor and click mapping.
+- Layout is responsive and always fills the screen (`lib/arrange.ts`, one engine for the DOM wall, the CRT compositor,
+  CRT click mapping and arrow-key navigation via `publishGeometry`/`neighbour`). The user sets a **preview size**
+  (`previewSize`, px of tile width; slider / L, Shift+L); the wall shows as many 4:3 previews as fit and reports that
+  capacity back (`actions.setCapacity`), so paging / patrol move by one screenful.
+- Pin levels: previews → pinned → full (`focused`). Pinned has a size, `pinMode`: "side" (block top-left, previews right
+  + below — the classic 1+N) or "wide" (block as wide as fits, previews either side + below). Previews and the pinned
+  block share one regular grid so every preview is the same size and aligned. Enter/double-click step up, Esc down;
+  clicking a small tile while pinned pins it instead; unpinning returns the video to its original cell (`pinFrom`).
 - No right sidebar. The selected (or pinned) video's details + map sit at the top of the left sidebar
   (`components/deck/Sidebar.tsx`), above the channel guide. Theatre mode (`T`) hides the whole sidebar.
 - Pin / single-view controls are one component and one style everywhere (`components/PinButtons.tsx`, `.icon-btn`):

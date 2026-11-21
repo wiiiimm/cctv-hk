@@ -110,15 +110,20 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .tb-group { display: flex; align-items: center; gap: 6px; padding-left: var(--sp-3); border-left: 1px solid var(--line); }
 
 /* Layout picker: a segmented control. */
-.seg { display: flex; gap: 1px; height: var(--ctl-h); padding: 1px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--well); }
-.lay { width: 28px; height: 100%; display: grid; place-items: center; padding: 4px 5px; border: 0; border-radius: var(--r-sm); background: none; transition: background var(--ease); }
-.lay:hover { background: var(--panel-3); }
-.lay.on { background: var(--sel-soft); box-shadow: inset 0 0 0 1px var(--sel); }
-.lay-icon { display: grid; gap: 1px; width: 100%; height: 100%; }
-.lay-icon i { background: var(--dim); border-radius: 1px; }
-.lay-icon i.big { background: var(--muted); }
-.lay:hover .lay-icon i { background: var(--text); }
-.lay.on .lay-icon i { background: var(--sel); }
+/* Pinned sizes: three icon buttons kept tight together. */
+.pin-modes { display: inline-flex; gap: 2px; }
+
+/* Preview size: smaller · slider · bigger · count. */
+.preview-size { gap: var(--sp-1); }
+.size-slider { -webkit-appearance: none; appearance: none; width: 110px; height: var(--ctl-h); margin: 0 2px; background: none; cursor: pointer; }
+.size-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--line-2); }
+.size-slider::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line-2); }
+.size-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: var(--text); border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line-3); }
+.size-slider::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--text); border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line-3); }
+.size-slider:hover::-webkit-slider-thumb { background: var(--sel); }
+.size-slider:hover::-moz-range-thumb { background: var(--sel); }
+.size-slider:focus-visible { outline: 2px solid var(--sel); outline-offset: 2px; border-radius: var(--r-sm); }
+.preview-count { min-width: 26px; height: var(--ctl-h); display: inline-grid; place-items: center; padding: 0 6px; border-radius: var(--r); background: var(--well); border: 1px solid var(--line-2); font: 500 var(--fs-md) / 1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* Text buttons. A .toggle carries a status lamp: dark = off, yellow = on (red while patrolling). */
 .pill { text-transform: none; }
@@ -323,10 +328,8 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
   .statusbar .keys { display: none; }
 }
 @media (max-width: 760px) {
-  body { overflow: auto; }
-  .app { height: auto; min-height: 100dvh; }
+  /* The sidebar is a drawer on phones, so the wall takes the whole screen below the top bar. */
   .body { grid-template-columns: 1fr; }
-  .stage { height: 62dvh; }
   .tb-group { padding-left: 0; border-left: 0; }
   .clock span { display: none; }
   .statusbar .credit { display: none; }

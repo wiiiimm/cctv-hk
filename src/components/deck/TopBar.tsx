@@ -1,22 +1,14 @@
-import { LAYOUTS, actions, hasPinnedVariant, pinnedLayout, useStore } from "../../lib/store";
+import { actions, useStore } from "../../lib/store";
 import { PRESETS } from "../../lib/crt/presets";
-import { slots } from "../../lib/layout";
+import { PREVIEW_MAX, PREVIEW_MIN, PREVIEW_STEP } from "../../lib/arrange";
 import { useT } from "../../lib/i18n";
 import { hkDate, hkTime, useClock } from "../../hooks/useClock";
-import { PinToggle } from "../PinButtons";
-
-function LayoutIcon({ c, r, sp }: { c: number; r: number; sp: number }) {
-  return (
-    <span className="lay-icon" style={{ gridTemplateColumns: `repeat(${c},1fr)`, gridTemplateRows: `repeat(${r},1fr)` }} aria-hidden>
-      {slots(c, r, sp).map((s, i) => (
-        <i key={i} className={s.span > 1 ? "big" : ""} style={{ gridColumn: `${s.col + 1} / span ${s.span}`, gridRow: `${s.row + 1} / span ${s.span}` }} />
-      ))}
-    </span>
-  );
-}
+import { IconButton, PinModes, PinToggle } from "../PinButtons";
+import { BiggerIcon, SmallerIcon } from "../icons";
 
 export function TopBar({ onGuide }: { onGuide: () => void }) {
-  const { gridCols, gridRows, pinned, focused, patrol, patrolSec, muted, mode, crtPreset, lang, theater } = useStore((s) => s);
+  const { previewSize, cells, pinned, patrol, patrolSec, muted, mode, crtPreset, lang, theater } = useStore((s) => s);
+  const previews = Math.max(0, cells.length - (pinned ? 1 : 0));
   const t = useT();
   const now = useClock();
   const crtOn = mode === "crt";
@@ -30,22 +22,26 @@ export function TopBar({ onGuide }: { onGuide: () => void }) {
         <span className="brand-alt">{lang === "zh" ? "HK CCTV" : "香港閉路電視"}</span>
       </div>
 
-      <div className="tb-group" role="group" aria-label={t.layout}>
-        <div className="seg">
-          <button type="button" className={`lay${focused ? " on" : ""}`} onClick={() => (focused ? actions.unfocus() : actions.focus())} title={t.soloTitle}>
-            <LayoutIcon c={1} r={1} sp={0} />
-          </button>
-          {LAYOUTS.map(([c, r]) => {
-            const [pc, pr, ps] = pinnedLayout(c, r);
-            const on = !focused && c === gridCols && r === gridRows;
-            return (
-              <button key={`${c}x${r}`} type="button" className={`lay${on ? " on" : ""}`} onClick={() => actions.setLayout(c, r)} title={pinned ? `${c}×${r} · ${hasPinnedVariant(c, r) ? `${t.pinned} 1+${slots(pc, pr, ps).length - 1}` : t.solo}` : `${c}×${r}`}>
-                {pinned && hasPinnedVariant(c, r) ? <LayoutIcon c={pc} r={pr} sp={ps} /> : <LayoutIcon c={c} r={r} sp={0} />}
-              </button>
-            );
-          })}
-        </div>
+      {/* Preview size: the wall fills the screen with as many previews as fit at this size. */}
+      <div className="tb-group preview-size" role="group" aria-label={t.previewSize}>
+        <IconButton icon={<SmallerIcon />} label={t.smallerPreviews} onPress={() => actions.resizePreviews(-1)} />
+        <input
+          type="range"
+          className="size-slider"
+          min={PREVIEW_MIN}
+          max={PREVIEW_MAX}
+          step={PREVIEW_STEP}
+          value={previewSize}
+          onChange={(e) => actions.setPreviewSize(+e.target.value)}
+          aria-label={t.previewSize}
+          title={`${t.previewSize}: ${previews}`}
+        />
+        <IconButton icon={<BiggerIcon />} label={t.biggerPreviews} onPress={() => actions.resizePreviews(1)} />
+        <span className="preview-count" title={t.previewCount}>
+          {previews}
+        </span>
         <PinToggle />
+        <PinModes />
       </div>
 
       <div className="tb-group" role="group" aria-label={t.patrol}>

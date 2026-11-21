@@ -3,12 +3,22 @@ import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed } from "../../lib/channels";
 import { retain, useSnap } from "../../lib/snapshots";
 import { actions, store, useStore } from "../../lib/store";
 import { drawScreen } from "../../lib/crt/compositor";
-import { fitWall, slotRect, slots } from "../../lib/layout";
+import { fitWall } from "../../lib/layout";
+import { arrange, publishGeometry, type PinMode, type Rect } from "../../lib/arrange";
 import { CrtRenderer, ON, powerOff, powerOn } from "../../lib/crt/renderer";
 import { crtInset, presetById } from "../../lib/crt/presets";
 import { chName, useT } from "../../lib/i18n";
 import { powerThunk, staticBurst } from "../../lib/audio";
 import { PinControls } from "../monitor/PinControls";
+
+/** The CRT wall arrangement in CSS px of the tube (same engine as the DOM wall, inside the safe-area inset). */
+function crtLayout(w: number, h: number, s: { previewSize: number; pinned: boolean; pinMode: PinMode; focused: boolean; crtPreset: string }): Rect[] {
+  const m = crtInset(presetById(s.crtPreset).curvature);
+  const mx = w * m;
+  const my = h * m;
+  const a = arrange({ w: w - mx * 2, h: h - my * 2, previewW: s.previewSize, pinned: s.pinned, pinMode: s.pinMode, solo: s.focused, gap: s.focused ? 0 : 3 });
+  return a.rects.map((r) => ({ ...r, x: r.x + mx, y: r.y + my }));
+}
 
 /**
  * CRT picture mode for the main viewer: the same wall, composited into a 2D canvas and run through
@@ -30,9 +40,8 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   const pin = {
     pinned: useStore((s) => s.pinned),
     focused: useStore((s) => s.focused),
-    cols: useStore((s) => s.cols),
-    rows: useStore((s) => s.rows),
-    span: useStore((s) => s.span),
+    previewSize: useStore((s) => s.previewSize),
+    pinMode: useStore((s) => s.pinMode),
   };
   const t = useT();
   const visible = single ? [cells[selected]] : cells;
@@ -133,9 +142,9 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
         src.height,
         {
           cells: s.cells,
-          cols: s.cols,
-          rows: s.rows,
-          span: s.span,
+          pinned: s.pinned,
+          pinMode: s.pinMode,
+          previewW: s.previewSize,
           selected: s.selected,
           single: isSingle,
           entry: s.entry,
@@ -180,14 +189,9 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
       return;
     }
     const r = e.currentTarget.getBoundingClientRect();
-    const m = crtInset(presetById(s.crtPreset).curvature);
-    const fit = fitWall(r.width * (1 - m * 2), r.height * (1 - m * 2), s.cols, s.rows, 0);
-    const px = e.clientX - r.left - r.width * m;
-    const py = e.clientY - r.top - r.height * m;
-    const i = slots(s.cols, s.rows, s.span).findIndex((sl) => {
-      const q = slotRect(fit, sl, 0);
-      return px >= q.x && px < q.x + q.w && py >= q.y && py < q.y + q.h;
-    });
+    const px = e.clientX - r.left;
+    const py = e.clientY - r.top;
+    const i = crtLayout(r.width, r.height, s).findIndex((q) => px >= q.x && px < q.x + q.w && py >= q.y && py < q.y + q.h);
     if (i < 0) return;
     if (dbl) actions.escalate(s.pinned && i > 0 ? 0 : i);
     else if (s.pinned) actions.pin(i);
@@ -201,17 +205,23 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   cell.x += size.w * inset;
   cell.y += size.h * inset;
   // Pin controls float over the selected tile (PIN) or the pinned video (SOLO / UNPIN), matching the CRT geometry.
+  const rects = size.w > 0 ? crtLayout(size.w, size.h, { ...pin, crtPreset: preset }) : [];
   let controls: { role: "selected" | "pinned" | "solo"; index: number; x: number; y: number; w: number; h: number } | null = null;
-  if (size.w > 0) {
-    const gap = pin.focused ? 0 : Math.max(2, Math.round(size.w / 400));
-    const fit = fitWall(size.w * (1 - inset * 2), size.h * (1 - inset * 2), pin.focused ? 1 : pin.cols, pin.focused ? 1 : pin.rows, gap);
-    const layout = pin.focused ? [{ col: 0, row: 0, span: 1 }] : slots(pin.cols, pin.rows, pin.span);
+  if (rects.length) {
     const onPinned = pin.focused || (pin.pinned && selected === 0);
     const index = onPinned ? 0 : selected;
     const role = pin.focused ? "solo" : onPinned ? "pinned" : "selected";
-    const q = slotRect(fit, layout[index] ?? layout[0], gap);
-    controls = { role, index, x: q.x + size.w * inset, y: q.y + size.h * inset, w: q.w, h: q.h };
+    const q = rects[pin.focused ? 0 : index] ?? rects[0];
+    controls = { role, index, x: q.x, y: q.y, w: q.w, h: q.h };
   }
+  // Same capacity / navigation contract as the DOM wall.
+  const capacity = rects.length;
+  useEffect(() => {
+    if (!pin.focused && capacity > 0) actions.setCapacity(capacity);
+  }, [capacity, pin.focused]);
+  useEffect(() => {
+    publishGeometry(pin.focused ? [] : rects);
+  });
 
   return (
     <div className={`crt-tube${fallback ? " no-gl" : ""}`} ref={wrapRef} onClick={(e) => onPointer(e, false)} onDoubleClick={(e) => onPointer(e, true)}>

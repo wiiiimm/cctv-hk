@@ -1,27 +1,23 @@
 // App state for the viewing engine. The console UI and the CRT shell both read and drive this one store.
 import { useSyncExternalStore } from "react";
 import { CHANNELS, CHANNEL_BY_KEY, CHANNEL_BY_NUM, GROUP_BY_ID } from "./channels";
-import { slotCount, slots } from "./layout";
+import { PREVIEW_DEFAULT, PREVIEW_MAX, PREVIEW_MIN, PREVIEW_STEP, liveGeometry, neighbour, type PinMode } from "./arrange";
 
 export type Mode = "console" | "crt";
 export type Lang = "en" | "zh";
 
 export interface State {
-  /** The grid the user chose (top-bar layout). */
-  gridCols: number;
-  gridRows: number;
+  /** Width (CSS px) the user wants each preview (non-pinned video) to be. The wall fills the screen with as many as fit. */
+  previewSize: number;
   /**
-   * Pin levels: plain grid → pinned (cell 0 takes the big slot of the grid's pinned variant, see `pinnedLayout`)
-   * → solo (`focused`: only the pinned video is shown). `focused` implies `pinned`.
+   * Pin levels: wall of previews → pinned (cell 0 is shown large beside / above the previews)
+   * → solo (`focused`: only the pinned video). `focused` implies `pinned`.
    */
   pinned: boolean;
-  /** Where the pinned video sat in the plain grid, so unpinning puts it back. */
+  /** Where the pinned video sat among the previews, so unpinning puts it back. */
   pinFrom: number;
-  /** Effective layout on screen, derived from the grid and the pin. */
-  cols: number;
-  rows: number;
-  /** Size of the pinned slot in grid units (0 = plain grid). */
-  span: number;
+  /** Pinned size: "wide" (full width, previews below) or "side" (previews right and below). Full = `focused`. */
+  pinMode: PinMode;
   /** Hide the guide and info panel so the wall uses the full width. */
   theater: boolean;
   cells: string[];
@@ -45,32 +41,8 @@ export interface State {
   entry: string;
 }
 
-/** Grids offered in the top bar (1×1 is not a grid: it is the solo pin). Pinning turns a grid into its pinned variant. */
-export const LAYOUTS: [number, number][] = [
-  [2, 2],
-  [3, 2],
-  [3, 3],
-  [4, 3],
-  [4, 4],
-  [5, 4],
-  [6, 6],
-];
-
-/** Grids with fewer than 3 rows or columns (2×2, 3×2) have no big+small variant: pinning there goes straight to solo. */
-export const hasPinnedVariant = (cols: number, rows: number) => Math.min(cols, rows) >= 3;
-
-/**
- * The pinned variant of a cols×rows grid: one big slot (span×span units, top-left) plus small tiles.
- * 3×3 → 1+5, 4×3 → 1+8, 4×4 → 1+7, 5×4 → 1+11, 6×6 → 1+11. Small grids keep their shape (shown solo).
- */
-export function pinnedLayout(cols: number, rows: number): [number, number, number] {
-  if (!hasPinnedVariant(cols, rows)) return [cols, rows, 0];
-  const span = Math.min(cols, rows) - 1;
-  return [cols, rows, span];
-}
-
 const STORAGE_KEY = "cctv-hk:v1";
-const PERSIST: (keyof State)[] = ["gridCols", "gridRows", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "patrolSec", "muted"];
+const PERSIST: (keyof State)[] = ["previewSize", "pinMode", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "patrolSec", "muted"];
 
 function groupKeys(s: Pick<State, "groupId" | "favourites">): string[] {
   if (s.groupId === "favourites") return s.favourites.length ? s.favourites : GROUP_BY_ID.get("featured")!.keys;
@@ -85,13 +57,11 @@ function pageCells(keys: string[], page: number, n: number): string[] {
 
 function initial(): State {
   const base: State = {
-    gridCols: 4,
-    gridRows: 3,
+    // Small screens start with smaller previews; landscape screens pin "side", portrait ones "wide".
+    previewSize: smallScreen() ? 160 : PREVIEW_DEFAULT,
     pinned: false,
     pinFrom: 0,
-    cols: 4,
-    rows: 3,
-    span: 0,
+    pinMode: typeof window !== "undefined" && window.innerWidth < window.innerHeight ? "wide" : "side",
     theater: false,
     cells: [],
     selected: 0,
@@ -118,23 +88,11 @@ function initial(): State {
   }
   base.favourites = base.favourites.filter((k) => CHANNEL_BY_KEY.has(k));
   if (!base.pinned) base.focused = false;
-  if (base.pinned && !hasPinnedVariant(base.gridCols, base.gridRows)) base.focused = true;
-  if (base.gridCols * base.gridRows > 1 && !LAYOUTS.some(([c, r]) => c === base.gridCols && r === base.gridRows)) {
-    // Custom n×m grids are no longer offered: fall back to the default grid.
-    base.gridCols = 4;
-    base.gridRows = 3;
-  }
-  if (base.gridCols * base.gridRows <= 1) {
-    // Older saves used a 1×1 grid for single view; that is now the solo pin.
-    base.gridCols = 4;
-    base.gridRows = 3;
-    base.pinned = true;
-    base.focused = true;
-  }
-  [base.cols, base.rows, base.span] = base.pinned ? pinnedLayout(base.gridCols, base.gridRows) : [base.gridCols, base.gridRows, 0];
-  const n = slotCount(base.cols, base.rows, base.span);
+  base.previewSize = clampPreview(Number(base.previewSize) || PREVIEW_DEFAULT);
+  if (base.pinMode !== "wide" && base.pinMode !== "side") base.pinMode = "side";
+  // Until the wall reports how many previews fit, start with a screenful's worth from the group.
   base.cells = base.cells.filter((k) => CHANNEL_BY_KEY.has(k));
-  if (base.cells.length !== n) base.cells = pageCells(groupKeys(base), base.page, n);
+  if (!base.cells.length) base.cells = pageCells(groupKeys(base), base.page, 12);
   return base;
 }
 
@@ -197,68 +155,65 @@ function stepIn(keys: string[], key: string, dir: number): string {
   return keys[(i + dir + keys.length) % keys.length];
 }
 
+const smallScreen = () => typeof window !== "undefined" && Math.min(window.innerWidth, window.innerHeight) < 600;
+const clampPreview = (px: number) => Math.max(PREVIEW_MIN, Math.min(PREVIEW_MAX, Math.round(px / PREVIEW_STEP) * PREVIEW_STEP));
+
 /** Typed channel numbers auto-tune after this pause. */
 export const ENTRY_TIMEOUT_MS = 1800;
 let entryTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const actions = {
-  /** Choose the grid. A pinned video stays pinned, in the new grid's pinned variant. */
-  setLayout(gridCols: number, gridRows: number) {
-    update((s) => {
-      const pinned = s.pinned && gridCols * gridRows > 1;
-      const [cols, rows, span] = pinned ? pinnedLayout(gridCols, gridRows) : [gridCols, gridRows, 0];
-      const n = slotCount(cols, rows, span);
-      const cells = fillCells(s, s.cells, n);
-      return {
-        gridCols,
-        gridRows,
-        pinned,
-        pinFrom: Math.min(s.pinFrom, gridCols * gridRows - 1),
-        cols,
-        rows,
-        span,
-        cells,
-        selected: pinned ? 0 : Math.min(s.selected, n - 1),
-        focused: pinned && !hasPinnedVariant(gridCols, gridRows),
-      };
+  /** Preview size (px of tile width). The wall re-fills the screen and reports its new capacity. */
+  setPreviewSize(px: number) {
+    update({ previewSize: clampPreview(px) });
+  },
+  resizePreviews(dir: number) {
+    actions.setPreviewSize(get().previewSize + dir * PREVIEW_STEP * 2);
+  },
+  /**
+   * The on-screen wall reports how many cells it can show (pinned video included). Keep what is on screen,
+   * continue through the group for new slots, and drop the overflow.
+   */
+  setCapacity(n: number) {
+    const s = get();
+    if (n < 1 || n === s.cells.length) return;
+    update((st) => {
+      const cells = fillCells(st, st.cells, n);
+      return { cells, selected: Math.min(st.selected, n - 1) };
     });
   },
-  cycleLayout(dir: number) {
-    const s = get();
-    let i = LAYOUTS.findIndex(([c, r]) => c === s.gridCols && r === s.gridRows);
-    if (i < 0) i = 3;
-    const [c, r] = LAYOUTS[(i + dir + LAYOUTS.length) % LAYOUTS.length];
-    actions.setLayout(c, r);
-  },
-  /** Pin cell `i`: switch to the grid's pinned variant with that video in the big slot. */
+  /** Pin cell `i`: it is shown large, and the previews re-fill around it. */
   pin(i?: number) {
     update((s) => {
       const at = i ?? s.selected;
       if (at < 0 || at >= s.cells.length) return {};
+      const cells = [...s.cells];
       if (s.pinned) {
-        // Already pinned: pin a different video by swapping it into the big slot.
+        // Already pinned: pin a different video by swapping it into the pinned slot.
         if (at === 0) return {};
-        const cells = [...s.cells];
         [cells[0], cells[at]] = [cells[at], cells[0]];
         return { cells, selected: 0, switchedAt: Date.now(), switchedCell: 0 };
       }
-      const [cols, rows, span] = pinnedLayout(s.gridCols, s.gridRows);
-      const rest = s.cells.filter((_, k) => k !== at);
-      const cells = fillCells(s, [s.cells[at], ...rest], slotCount(cols, rows, span));
-      const solo = !hasPinnedVariant(s.gridCols, s.gridRows);
-      return { pinned: true, pinFrom: at, cols, rows, span, cells, selected: 0, focused: solo, switchedCell: solo ? -1 : 0, switchedAt: Date.now() };
+      const [picked] = cells.splice(at, 1);
+      return { pinned: true, pinFrom: at, cells: [picked, ...cells], selected: 0, focused: false, switchedCell: 0, switchedAt: Date.now() };
     });
   },
-  /** Back to the plain grid, with the pinned video returned to where it came from. */
+  /** Back to a wall of previews, with the pinned video returned to where it came from. */
   unpin() {
     update((s) => {
       if (!s.pinned) return {};
-      const n = s.gridCols * s.gridRows;
-      const back = Math.min(s.pinFrom, n - 1);
+      const back = Math.min(s.pinFrom, s.cells.length - 1);
       const rest = s.cells.slice(1);
       rest.splice(back, 0, s.cells[0]);
-      return { pinned: false, cols: s.gridCols, rows: s.gridRows, span: 0, cells: fillCells(s, rest, n), selected: back, focused: false, switchedCell: -1 };
+      return { pinned: false, cells: rest, selected: back, focused: false, switchedCell: -1 };
     });
+  },
+  /** Choose how the pinned video is shown: "wide", "side", or "full" (only the pinned video). Pins the selection if needed. */
+  setPinMode(mode: PinMode | "full") {
+    const s = get();
+    if (!s.pinned) actions.pin();
+    if (mode === "full") actions.focus(0);
+    else update({ pinMode: mode, focused: false });
   },
   togglePin() {
     const s = get();
@@ -269,7 +224,9 @@ export const actions = {
   loadGroup(groupId: string) {
     update((s) => {
       const keys = groupKeys({ ...s, groupId });
-      return { groupId, page: 0, cells: pageCells(keys, 0, s.cells.length), switchedAt: Date.now(), switchedCell: -1 };
+      const fixed = s.pinned ? 1 : 0;
+      const cells = [...s.cells.slice(0, fixed), ...pageCells(keys, 0, Math.max(1, s.cells.length - fixed))];
+      return { groupId, page: 0, cells, switchedAt: Date.now(), switchedCell: -1 };
     });
   },
   pageStep(dir: number) {
@@ -280,10 +237,12 @@ export const actions = {
         return { cells, switchedAt: Date.now(), switchedCell: s.selected };
       }
       const keys = groupKeys(s);
-      const n = s.cells.length;
+      const fixed = s.pinned ? 1 : 0; // the pinned video stays; only previews page
+      const n = Math.max(1, s.cells.length - fixed);
       const pages = Math.max(1, Math.ceil(keys.length / n));
       const page = (s.page + dir + pages) % pages;
-      return { page, cells: pageCells(keys, page, n), switchedAt: Date.now(), switchedCell: -1 };
+      const cells = [...s.cells.slice(0, fixed), ...pageCells(keys, page, n)];
+      return { page, cells, switchedAt: Date.now(), switchedCell: -1 };
     });
   },
   channelStep(dir: number) {
@@ -327,29 +286,13 @@ export const actions = {
   select(i: number) {
     update((s) => ({ selected: Math.max(0, Math.min(s.cells.length - 1, i)) }));
   },
+  /** Move the selection to the visually adjacent tile in the arrangement currently on screen. */
   moveSelection(dx: number, dy: number) {
     update((s) => {
-      if (s.span <= 1) {
-        const x = (s.selected % s.cols + dx + s.cols) % s.cols;
-        const y = (Math.floor(s.selected / s.cols) + dy + s.rows) % s.rows;
-        return { selected: y * s.cols + x };
-      }
-      // Spotlight layouts: step to the nearest slot whose centre lies in that direction.
-      const all = slots(s.cols, s.rows, s.span).map((p) => ({ x: p.col + p.span / 2, y: p.row + p.span / 2 }));
-      const from = all[s.selected];
-      let best = -1;
-      let bestD = Infinity;
-      all.forEach((p, i) => {
-        const along = (p.x - from.x) * dx + (p.y - from.y) * dy;
-        if (i === s.selected || along <= 0) return;
-        const across = Math.abs((p.x - from.x) * dy) + Math.abs((p.y - from.y) * dx);
-        const d = along + across * 2;
-        if (d < bestD) {
-          bestD = d;
-          best = i;
-        }
-      });
-      return best >= 0 ? { selected: best } : {};
+      const geo = liveGeometry();
+      if (geo.length !== s.cells.length) return {};
+      const next = neighbour(geo, s.selected, dx, dy);
+      return next >= 0 ? { selected: next } : {};
     });
   },
   toggleTheater() {
@@ -362,11 +305,9 @@ export const actions = {
     if (!s.pinned || at > 0) actions.pin(at);
     update({ focused: true, selected: 0, switchedCell: -1 });
   },
-  /** Solo → pinned grid (or straight back to the plain grid when the grid has no pinned variant). */
+  /** Solo → pinned. */
   unfocus() {
-    const s = get();
-    if (s.pinned && !hasPinnedVariant(s.gridCols, s.gridRows)) actions.unpin();
-    else update({ focused: false });
+    update({ focused: false });
   },
   toggleFocus() {
     const s = get();

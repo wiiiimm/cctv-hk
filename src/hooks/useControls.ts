@@ -66,7 +66,7 @@ export function useControls() {
             break;
           case "l":
           case "L":
-            actions.cycleLayout(e.shiftKey ? -1 : 1);
+            actions.resizePreviews(e.shiftKey ? -1 : 1);
             break;
           case "p":
           case "P":
@@ -152,7 +152,7 @@ export function useControls() {
         if (hit(15)) single ? actions.channelStep(1) : actions.moveSelection(1, 0);
         if (hit(0)) (s.focused ? actions.unfocus() : actions.escalate());
         if (hit(1)) actions.deescalate();
-        if (hit(2)) actions.cycleLayout(1);
+        if (hit(2)) actions.resizePreviews(1);
         if (hit(3)) actions.toggleMap();
         if (hit(4)) actions.channelStep(-1);
         if (hit(5)) actions.channelStep(1);

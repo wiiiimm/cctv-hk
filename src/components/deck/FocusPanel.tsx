@@ -4,7 +4,7 @@ import { actions, activeKey, useStore } from "../../lib/store";
 import { chAltName, chDistrict, chName, chRegion, useT } from "../../lib/i18n";
 import { ago, hkStamp, useClock } from "../../hooks/useClock";
 import { MiniMap } from "../MiniMap";
-import { PinToggle, SoloToggle } from "../PinButtons";
+import { PinModes, PinToggle } from "../PinButtons";
 
 export function FocusPanel({ compact = false }: { compact?: boolean }) {
   const key = useStore(activeKey);
@@ -69,7 +69,7 @@ export function FocusPanel({ compact = false }: { compact?: boolean }) {
         <button type="button" className="btn" onClick={() => actions.channelStep(-1)} title="PgDn / −">{t.chDown}</button>
         <button type="button" className="btn" onClick={() => actions.channelStep(1)} title="PgUp / +">{t.chUp}</button>
         <PinToggle />
-        <SoloToggle />
+        <PinModes />
         <button type="button" className={`icon-btn${fav ? " on" : ""}`} onClick={() => actions.toggleFavourite(ch.key)} title="*" aria-label={fav ? t.removeFav : t.addFav} aria-pressed={fav}>
           ★
         </button>

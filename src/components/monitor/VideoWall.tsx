@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { fitWall, slotRect, slots } from "../../lib/layout";
-import { useStore } from "../../lib/store";
+import { arrange, publishGeometry } from "../../lib/arrange";
+import { actions, useStore } from "../../lib/store";
 import { Tile } from "./Tile";
 
 export const WALL_GAP = 3;
 
-/** The central viewing surface: an n×m (or spotlight) wall of 4:3 monitors, or one focused feed. */
+/**
+ * The central viewing surface. It always fills the stage: as many previews as fit at the user's preview size,
+ * with the pinned video (if any) shown large beside or above them. It reports its capacity back to the store.
+ */
 export function VideoWall() {
-  const { cols, rows, span, cells, selected, focused, muted, pinned } = useStore((s) => s);
+  const { cells, selected, focused, muted, pinned, previewSize, pinMode } = useStore((s) => s);
   const ref = useRef<HTMLDivElement>(null);
   const [area, setArea] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -17,31 +20,39 @@ export function VideoWall() {
     return () => ro.disconnect();
   }, []);
 
-  const single = focused || cells.length === 1;
-  const c = single ? 1 : cols;
-  const r = single ? 1 : rows;
-  const layout = single ? [{ col: 0, row: 0, span: 1 }] : slots(cols, rows, span);
-  const shown = single ? [selected] : cells.map((_, i) => i);
-  const allowVideo = single || cells.length <= 4;
-  const fit = fitWall(area.w, area.h, c, r, WALL_GAP);
+  const solo = focused;
+  const layout = arrange({ w: area.w, h: area.h, previewW: previewSize, pinned, pinMode, solo, gap: WALL_GAP });
+
+  // Adopt the capacity (not while solo: the previews are just hidden, so keep them).
+  const capacity = layout.rects.length;
+  useEffect(() => {
+    if (!solo && capacity > 0) actions.setCapacity(capacity);
+  }, [capacity, solo]);
+  useEffect(() => {
+    publishGeometry(solo ? [] : layout.rects);
+  });
+
+  const shown = solo ? [selected] : cells.map((_, i) => i).slice(0, layout.rects.length);
+  const allowVideo = solo || cells.length <= 4;
 
   return (
-    <div className="wall-area" ref={ref}>
+    <div className={`wall-area wall-${layout.kind}`} ref={ref}>
       {area.w > 0 &&
         shown.map((i, slot) => {
-          const rect = slotRect(fit, layout[slot], WALL_GAP);
-          const big = single || (span > 1 && i === 0);
+          const rect = layout.rects[slot];
+          if (!rect) return null;
+          const big = solo || (pinned && i === 0);
           return (
-            <div key={single ? `focus-${i}` : i} className="slot" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
+            <div key={solo ? `focus-${i}` : i} className="slot" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
               <Tile
-                pinRole={focused ? "solo" : pinned && i === 0 ? "pinned" : !single && i === selected && !big ? "selected" : undefined}
+                pinRole={solo ? "solo" : pinned && i === 0 ? "pinned" : i === selected && !big ? "selected" : undefined}
                 index={i}
                 channelKey={cells[i]}
-                // The pinned (big) video needs no selection highlight; small tiles still get one.
-                selected={!single && i === selected && !big}
+                // The pinned (big) video needs no selection highlight; previews still get one.
+                selected={!solo && i === selected && !big}
                 large={big}
                 allowVideo={allowVideo || big}
-                muted={muted || !(single || i === selected)}
+                muted={muted || !(solo || i === selected)}
               />
             </div>
           );
