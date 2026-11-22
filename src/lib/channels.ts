@@ -239,29 +239,45 @@ export const CHANNELS: Channel[] = locate(build());
 export const CHANNEL_BY_KEY = new Map(CHANNELS.map((c) => [c.key, c]));
 export const CHANNEL_BY_NUM = new Map(CHANNELS.map((c) => [c.num, c]));
 
+// The starting line-up (about 30): a mix of every kind of feed, in the order it fills the wall. Entries are a channel
+// key, "#<channel number>", or "td:<text>" = the first traffic camera whose English name contains it.
 const FEATURED_HINTS = [
-  "hko:HK2",
-  "yt:Z8NTLkEFZjg",
-  "hko:VPB",
+  "hko:HK2", // Tsim Sha Tsui & ICC
+  "yt:Z8NTLkEFZjg", // TST live
   "td:Cross Harbour Tunnel",
+  "#251", // weather radar 64 km
+  "hko:VPB", // Victoria Peak
   "td:Gloucester Road",
-  "hko:CP1",
+  "#262", // speed map: Tate's Cairn / Lion Rock
+  "hko:CP1", // Central Pier
+  "yt:XN-ArdUrqtc", // harbour, East Kowloon
   "td:Nathan Road",
-  "td:Tsing Ma",
   "hko:IC1",
+  "td:Tsing Ma",
+  "yt:follow-hoy78cablenews", // Cable News (live or latest bulletin)
   "td:Lion Rock Tunnel",
-  "hko:CWB",
-  "td:Airport",
-  "yt:XN-ArdUrqtc",
+  "hko:CWB", // Clear Water Bay
+  "hko:WGL", // Waglan Island
+  "yt:ZbUAX0ZvTZI", // Tung Chung, HZMB port & airport
+  "hko:TM2", // Tai Mo Shan
   "td:Western Harbour",
-  "hko:LAM",
+  "#254", // satellite image
+  "hko:LAM", // Lamma
+  "td:Eastern Corridor",
+  "yt:follow-shunshunlee", // Victoria Harbour East
+  "td:Tuen Mun Road",
+  "hko:KLT", // Kowloon City
   "td:Tolo Highway",
+  "#264", // speed map
+  "hko:CCE", // Cheung Chau
+  "td:Canal Road",
+  "yt:follow-hkairportlivecam",
 ];
 
 function featured(): string[] {
   const used = new Set<string>();
   for (const hint of FEATURED_HINTS) {
-    const direct = CHANNEL_BY_KEY.get(hint);
+    const direct = hint.startsWith("#") ? CHANNELS.find((c) => c.num === Number(hint.slice(1))) : CHANNEL_BY_KEY.get(hint);
     if (direct) {
       used.add(direct.key);
       continue;
