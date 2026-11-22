@@ -143,13 +143,18 @@ const en = {
   stale: "STALE",
   noSignal: "NO SIGNAL",
   offAir: "OFF AIR",
+  replay: "REPLAY",
+  stReplay: "REPLAY (latest)",
   unavailable: "UNAVAILABLE",
+  unavailableShort: "N/A",
+  openOnYouTube: "Open on YouTube",
   maybeRegion: "May be region-restricted",
   searching: "SEARCHING…",
   seq: "SEQ ▶",
   lang: "中文",
   langTitle: "切換至中文",
-  kind: { td: "Traffic", hko: "Weather", yt: "Live" } as Record<FeedKind, string>,
+  // Feed type only. Whether a YouTube feed is live right now is the status badge (LIVE / REPLAY / OFF AIR).
+  kind: { td: "Traffic", hko: "Weather", yt: "Video" } as Record<FeedKind, string>,
 };
 
 type Dict = typeof en;
@@ -295,13 +300,17 @@ const zh: Dict = {
   stale: "過時",
   noSignal: "無訊號",
   offAir: "停播",
+  replay: "重播",
+  stReplay: "重播（最新）",
   unavailable: "暫不提供",
+  unavailableShort: "受限",
+  openOnYouTube: "在 YouTube 開啟",
   maybeRegion: "可能受地區限制",
   searching: "搜尋中…",
   seq: "輪巡 ▶",
   lang: "EN",
   langTitle: "Switch to English",
-  kind: { td: "交通", hko: "天氣", yt: "直播" },
+  kind: { td: "交通", hko: "天氣", yt: "影像" },
 };
 
 export const DICTS: Record<Lang, Dict> = { en, zh };

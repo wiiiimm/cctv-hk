@@ -1,9 +1,10 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import { CHANNELS, CHANNEL_BY_KEY, GROUPS, fmtNum } from "../../lib/channels";
+import { CHANNELS, CHANNEL_BY_KEY, GROUPS, fmtNum, type Channel } from "../../lib/channels";
 import { fuzzySearch } from "../../lib/search";
 import { actionTarget, actions, groupKeysOf, store, useStore } from "../../lib/store";
 import { chAltName, chDistrict, chName, groupLabel, useT } from "../../lib/i18n";
 import { GroupMenu } from "./GroupMenu";
+import { useListStatus, useListVideo } from "../../lib/snapshots";
 import { GroupMap } from "./GroupMap";
 import type { Lang } from "../../lib/store";
 
@@ -161,15 +162,17 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
                 title={t.assignTitle}
               >
                 <span className="num">{fmtNum(c.num)}</span>
-                <span className={`kind kind-${c.kind}`}>{t.kind[c.kind]}</span>
+                <KindBadge c={c} />
                 <span className="label">
                   <span className="nm">{chName(c, lang)}</span>
                   <span className="sub">
                     {chAltName(c, lang)} · {chDistrict(c, lang)}
                     {c.kind === "td" ? ` ${chDistrict(c, lang === "zh" ? "en" : "zh")}` : ""}
                   </span>
+                  {c.follow && <NowTitle c={c} />}
                 </span>
               </button>
+              {c.kind === "yt" && <YouTubeLink c={c} />}
               {/* Add to my groups, then favourite. */}
               <GroupMenu chKey={c.key} compact />
               <button type="button" className={`fav${fav ? " on" : ""}`} onClick={() => actions.toggleFavourite(c.key)} aria-label={fav ? t.removeFav : t.addFav}>
@@ -182,5 +185,34 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
       </ul>
       )}
     </section>
+  );
+}
+
+/** Row badge: traffic / weather show their type; video channels show what they're doing now (LIVE / REPLAY / OFF AIR). */
+function KindBadge({ c }: { c: Channel }) {
+  const t = useT();
+  const status = useListStatus(c);
+  if (c.kind !== "yt" || status === "unknown") return <span className={`kind kind-${c.kind}`}>{t.kind[c.kind]}</span>;
+  const label = { live: t.live, replay: t.replay, offair: t.offAir, blocked: t.unavailableShort }[status];
+  return <span className={`kind kind-yt st-${status}`}>{label}</span>;
+}
+
+/** Followed channels / recordings: the title of what's showing now (live stream or replay). */
+function NowTitle({ c }: { c: Channel }) {
+  const v = useListVideo(c);
+  return v?.title ? <span className="sub now-title">▸ {v.title}</span> : null;
+}
+
+/** ↗ opens the exact video this row is showing on YouTube (new tab) — every video channel has one. */
+function YouTubeLink({ c }: { c: Channel }) {
+  const t = useT();
+  const followed = useListVideo(c);
+  // Followed channels / recordings: the video showing now. Fixed streams: their own video.
+  const v = followed ?? (c.follow ? undefined : { id: c.code, title: undefined });
+  if (!v) return null;
+  return (
+    <a className="fav yt-link" href={`https://www.youtube.com/watch?v=${v.id}`} target="_blank" rel="noopener noreferrer" title={v.title ? `${t.openOnYouTube}: ${v.title}` : t.openOnYouTube} aria-label={t.openOnYouTube}>
+      ↗
+    </a>
   );
 }

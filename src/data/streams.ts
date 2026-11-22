@@ -5,6 +5,11 @@ export interface LiveStream {
   /** Channel number (1xx). Fixed per stream so removing one never renumbers the others (links, favourites). */
   num: number;
   id: string;
+  /** Follow a channel instead of one video (see NewsStream.follow); `replayMatch` filters what it replays. */
+  follow?: string;
+  replayMatch?: string;
+  /** Followed webcam: only ever play what is live now (old recordings of a webcam aren't worth replaying). */
+  liveOnly?: boolean;
   name: string;
   nameZh: string;
   channel: string;
@@ -13,17 +18,21 @@ export interface LiveStream {
 }
 
 export const LIVE_STREAMS: LiveStream[] = [
-  // Retired 2026-11-22: 101 TST, 102 TST street view, 104 Harbour East, 106 Causeway Bay, 107 Kwai Tsing sky,
-  // 108 HOY TV, 111 HK weather map. Don't reuse those numbers for different streams. (103 came back: same stream.)
+  // Retired 2026-11-22: 101 TST, 102 TST street view, 104 Harbour East, 105 Victoria Peak, 106 Causeway Bay, 107 Kwai Tsing sky,
+  // 108 HOY TV, 110 HKIA 3D air traffic, 111 HK weather map. Don't reuse those numbers for different streams. (103 came back: same stream.)
   // Not added (owner disabled embedding, so they can only ever be OFF AIR): K9Z_RrKpQTM Air-Flighting HKIA 3D,
   // NyMO5N6f490 香港天氣台 main weather stream.
   { num: 103, id: "XN-ArdUrqtc", name: "Victoria Harbour, East Kowloon", nameZh: "東九龍維港", channel: "Marcus Wong", lat: 22.3045, lon: 114.2135 },
-  { num: 105, id: "TIYZVyzOk4k", name: "Victoria Peak", nameZh: "太平山頂", channel: "Relaxing Music BGM", lat: 22.2759, lon: 114.1455 },
   { num: 109, id: "ygC5wni2DMQ", name: "HKIA ATC tracker", nameZh: "香港國際機場 ATC", channel: "VHHH/HKG", lat: 22.308, lon: 113.9185 },
-  { num: 110, id: "JPREngCARsA", name: "HKIA 3D air traffic", nameZh: "香港機場 3D 空中交通", channel: "VHHH ATC", lat: 22.308, lon: 113.9185 },
   { num: 112, id: "Z8NTLkEFZjg", name: "Tsim Sha Tsui", nameZh: "尖沙咀", channel: "Brainrolling Workshop", lat: 22.2955, lon: 114.1722 },
   { num: 113, id: "ZbUAX0ZvTZI", name: "Tung Chung, HZMB port & airport", nameZh: "東涌・港珠澳口岸・機場", channel: "RingBoy@介子仔", lat: 22.289, lon: 113.9425 },
   { num: 114, id: "OtreHvXgAoA", name: "Hong Kong cityscape (4K)", nameZh: "香港實時風景 (4K)", channel: "Brainrolling Workshop", lat: 22.293, lon: 114.1694 },
+  // Followed channels whose live video id changes: a harbour webcam restarted every so often, and two taxi dashcams.
+  { num: 120, id: "follow-hkairportlivecam", follow: "UCs3H75ak0L_iVLSmXwTORyQ", liveOnly: true, name: "Hong Kong Airport live cam", nameZh: "香港機場直播鏡頭", channel: "Hong Kong Airport Live Cam", lat: 22.308, lon: 113.9185 },
+  { num: 119, id: "follow-shunshunlee", follow: "UCAyQys2w6IkGrqkJyHe-4sQ", liveOnly: true, name: "Victoria Harbour East", nameZh: "維多利亞港東面", channel: "劉博 Eric Lau", lat: 22.2905, lon: 114.2055 },
+  { num: 117, id: "follow-dicgor", follow: "UCd14rUv839ARn76QULWoUdw", replayMatch: "的士直播|Taxi Live", name: "Taxi cam: DicGor", nameZh: "的士直播：DicGor", channel: "60後吃喝玩樂 DicGor" },
+  { num: 118, id: "follow-hktaxico", follow: "UCit3D7siKGfDPT5OaehBVpg", replayMatch: "的士直播|Taxi Live", name: "Taxi cam: HKtaxico", nameZh: "的士直播：香港的伯高", channel: "香港的伯高 HKtaxico" },
+  { num: 116, id: "follow-hkhoy", follow: "UCutSfYmIwdDOb4Ba7ObcaAQ", name: "HOY TV programmes (latest)", nameZh: "HOY 節目（最新）", channel: "HOY媒體網絡", lat: 22.3712, lon: 114.1123 },
   { num: 115, id: "g8GNxQBRff4", name: "Prince Edward view", nameZh: "太子景觀", channel: "香港天氣台", lat: 22.3245, lon: 114.1685 },
 ];
 
@@ -124,17 +133,38 @@ export interface NewsStream {
   apac?: boolean;
   /** Business / markets channel. */
   finance?: boolean;
+  /** Horse-racing channel (its own "Horse racing" group). */
+  racing?: boolean;
+  /**
+   * Follow a channel instead of one video: its YouTube channel id. For channels that stream bulletins (a new video id
+   * each time); the current one is resolved by /api/ytlive. `id` is then just a stable placeholder for the key.
+   */
+  follow?: string;
+  /**
+   * Followed channels only: when nothing is live, replay the channel's latest uploads (videos and past streams) whose
+   * title matches this regex source — e.g. just the news, not other programmes. Omit to replay everything.
+   */
+  replayMatch?: string;
+  /** …and never replay uploads whose title matches this (for channels whose news clips have no common keyword). */
+  replayExclude?: string;
   /** Estimated position (approximate): the named place, else the broadcaster's base / the country's main city. */
   lat?: number;
   lon?: number;
 }
 
 // All checked live and embeddable on 2026-11-22. None of TVB / Now / i-Cable / RTHK runs a public 24/7 YouTube stream
-// right now, so there is no Cantonese channel yet. Not added (embedding off): sRgR9c1WeH8 TimeAtlas market clocks.
+// as one fixed video; Cable News (HOY 78) streams each bulletin as a new video, so 452 follows the channel instead. Not added (embedding off): sRgR9c1WeH8 TimeAtlas market clocks.
 export const NEWS_STREAMS: NewsStream[] = [
   // Hong Kong / mainland China
   { num: 401, id: "Ry--eMIjYLQ", name: "Phoenix TV 24-hour live", nameZh: "鳳凰衛視 24小時直播間", channel: "鳳凰衛視 PhoenixTV", country: "Hong Kong", countryZh: "香港", lang: "cmn", apac: true, lat: 22.4501, lon: 114.183 },
   { num: 402, id: "0i7n3r01L2U", name: "CGTN", nameZh: "中國環球電視網 CGTN", channel: "CGTN", country: "China", countryZh: "中國", lang: "en", apac: true, lat: 39.9042, lon: 116.4074 },
+  { num: 452, id: "follow-hoy78cablenews", follow: "UC_q7e5XYJB0JDGagcF0KW0w", replayMatch: "新聞", name: "Cable News (HOY 78)", nameZh: "有線新聞 HOY 78", channel: "HOY 78 × 有線新聞 Cable News", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, lat: 22.3712, lon: 114.1123 },
+  { num: 453, id: "follow-rthk", follow: "UC6of7UYhctnYmqABjUqzuxw", replayExclude: "香港故事|世界技能|足本重溫", name: "RTHK news (hourly briefs & live events)", nameZh: "香港電台新聞（新聞簡報及現場直播）", channel: "RTHK 香港電台", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, lat: 22.3376, lon: 114.1805 },
+  { num: 454, id: "follow-tvbnews", follow: "UC_ifDTtFAcsj-wJ5JfM27CQ", replayMatch: "新聞|News", name: "TVB News (live & latest)", nameZh: "無綫新聞（直播及最新）", channel: "TVB NEWS Official 無綫新聞", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, lat: 22.278, lon: 114.2693 },
+  // Horse racing: race-day live shows and tips programmes; replays keep to racing (Fightclub also streams football).
+  { num: 455, id: "follow-whr-hk", follow: "UCSuzEzGo0zIK0wcpr8j46QQ", replayMatch: "賽馬", name: "WHR horse racing", nameZh: "贏跑賽馬台", channel: "贏跑賽馬台 WHR-HK", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, racing: true, lat: 22.4006, lon: 114.2036 },
+  { num: 456, id: "follow-fightclub-903", follow: "UCUdSiDWBtPZExreighMVfdQ", replayMatch: "賽馬", name: "Fightclub horse racing", nameZh: "博擊會 賽馬", channel: "博擊會 Fightclub", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, racing: true, lat: 22.4006, lon: 114.2036 },
+  { num: 457, id: "follow-hkjc", follow: "UCf1RN5E-JrLCzEzmXafYiQg", replayMatch: "賽馬|騎師|Race|早着先機|浪琴", name: "HKJC (Hong Kong Jockey Club)", nameZh: "香港賽馬會 HKJC", channel: "HKJC", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, racing: true, lat: 22.4006, lon: 114.2036 },
   // Taiwan
   { num: 403, id: "2mCSYvcfhtc", name: "TVBS News (55)", nameZh: "TVBS 新聞台 (55)", channel: "TVBS NEWS", country: "Taiwan", countryZh: "台灣", lang: "cmn", apac: true, lat: 25.0797, lon: 121.5745 },
   { num: 404, id: "o_-hSMgpAzs", name: "TVBS (56)", nameZh: "TVBS 56頻道", channel: "TVBS選新聞", country: "Taiwan", countryZh: "台灣", lang: "cmn", apac: true, lat: 25.0797, lon: 121.5745 },
@@ -153,7 +183,7 @@ export const NEWS_STREAMS: NewsStream[] = [
   { num: 416, id: "coYw-eVU0Ks", name: "TV Asahi News24", nameZh: "朝日電視台 NEWS24", channel: "ANNnewsCH", country: "Japan", countryZh: "日本", lang: "ja", apac: true, lat: 35.6596, lon: 139.7292 },
   { num: 417, id: "OxQQsIvJTTU", name: "KBS Korea", nameZh: "KBS 韓國", channel: "KBS WORLD TV", country: "South Korea", countryZh: "南韓", lang: "ko", apac: true, lat: 37.5249, lon: 126.9175 },
   { num: 418, id: "aZyD6EPl6KU", name: "YTN", nameZh: "YTN 韓國新聞", channel: "YTN", country: "South Korea", countryZh: "南韓", lang: "ko", apac: true, lat: 37.5793, lon: 126.8894 },
-  { num: 419, id: "vOTiJkg1voo", name: "ABC News Australia", nameZh: "澳洲 ABC 新聞", channel: "ABC News (Australia)", country: "Australia", countryZh: "澳洲", lang: "en", apac: true, lat: -33.8803, lon: 151.1973 },
+  { num: 419, id: "follow-abcnewsaustralia", follow: "UCVgO39Bk5sMo66-6o6Spn6Q", name: "ABC News Australia", nameZh: "澳洲 ABC 新聞", channel: "ABC News (Australia)", country: "Australia", countryZh: "澳洲", lang: "en", apac: true, lat: -33.8803, lon: 151.1973 },
   { num: 420, id: "Ereua4kbGWI", name: "News24 Australia", nameZh: "澳洲 News24", channel: "News24 (Sky News Australia)", country: "Australia", countryZh: "澳洲", lang: "en", apac: true, lat: -33.7765, lon: 151.1243 },
   { num: 421, id: "X-7LAkvfA5s", name: "WION", nameZh: "WION 印度國際新聞", channel: "WION", country: "India", countryZh: "印度", lang: "en", apac: true, lat: 28.5355, lon: 77.391 },
   { num: 422, id: "VzS75VuvLxs", name: "DZRH News", nameZh: "菲律賓 DZRH 新聞", channel: "DZRH News Television", country: "Philippines", countryZh: "菲律賓", lang: "tl", apac: true, lat: 14.5995, lon: 120.9842 },
@@ -241,4 +271,35 @@ export const SPACE_STREAMS: SpaceStream[] = [
   { num: 528, id: "3F0XlKxaqbk", name: "ISS spacewalk footage (ambient)", nameZh: "國際太空站太空漫步片段", channel: "WorldCam", place: "ISS", placeZh: "國際太空站" },
   { num: 529, id: "gZa9xUursO4", name: "Kennedy Space Center launches", nameZh: "甘迺迪太空中心發射", channel: "afarTV", place: "Florida", placeZh: "佛羅里達", lat: 28.5729, lon: -80.649 },
   { num: 530, id: "WCvtgdYhL_4", name: "Mars footage", nameZh: "火星影像", channel: "ElderFox Documentaries", place: "Mars", placeZh: "火星" },
+];
+
+/** Channels we follow (allow-list for /api/ytlive), with their replay title filter. */
+export function followedChannels(): { id: string; replayMatch?: string; replayExclude?: string; liveOnly?: boolean }[] {
+  return [...LIVE_STREAMS, ...NEWS_STREAMS].flatMap((s) =>
+    s.follow
+      ? [{ id: s.follow, replayMatch: s.replayMatch, replayExclude: "replayExclude" in s ? s.replayExclude : undefined, liveOnly: "liveOnly" in s ? s.liveOnly : undefined }]
+      : [],
+  );
+}
+
+/**
+ * Recorded news as channels (bank 6xx): numbered slots that always hold a followed channel's Nth most recent
+ * recording (same list as its replays: news titles, last 48 hours). Slot 1 = newest; empty slots are OFF AIR.
+ */
+export interface RecordingSource {
+  /** First channel number; slots are base … base + slots - 1. */
+  base: number;
+  slug: string;
+  follow: string;
+  name: string;
+  nameZh: string;
+  slots: number;
+  lat?: number;
+  lon?: number;
+}
+
+export const RECORDING_SOURCES: RecordingSource[] = [
+  { base: 601, slug: "tvb", follow: "UC_ifDTtFAcsj-wJ5JfM27CQ", name: "TVB News", nameZh: "無綫新聞", slots: 10, lat: 22.278, lon: 114.2693 },
+  { base: 611, slug: "cable", follow: "UC_q7e5XYJB0JDGagcF0KW0w", name: "Cable News", nameZh: "有線新聞", slots: 10, lat: 22.3712, lon: 114.1123 },
+  { base: 621, slug: "rthk", follow: "UC6of7UYhctnYmqABjUqzuxw", name: "RTHK News", nameZh: "香港電台新聞", slots: 10, lat: 22.3376, lon: 114.1805 },
 ];

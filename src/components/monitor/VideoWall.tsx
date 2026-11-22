@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { arrange, publishGeometry } from "../../lib/arrange";
 import { actions, bigAspect, feedCount, useStore, wallAspect } from "../../lib/store";
+import { CHANNEL_BY_KEY, MAX_PLAYING_PREVIEWS } from "../../lib/channels";
 import { FocusPanel } from "../deck/FocusPanel";
 import { Tile } from "./Tile";
 
@@ -41,6 +42,12 @@ export function VideoWall() {
   });
 
   const shown = solo ? [selected] : cells.map((_, i) => i).slice(0, layout.rects.length);
+  // Which previews may play: the first MAX_PLAYING_PREVIEWS video previews in wall order (pinned / selected always do).
+  const playable = new Set<number>();
+  for (const i of shown) {
+    if (playable.size >= MAX_PLAYING_PREVIEWS) break;
+    if (CHANNEL_BY_KEY.get(cells[i])?.kind === "yt" && !(pinned && i === 0) && i !== selected) playable.add(i);
+  }
 
   return (
     <div
@@ -65,9 +72,10 @@ export function VideoWall() {
                 large={big}
                 // Live YouTube only (traffic / weather are unaffected): the pinned / full-view video always plays;
                 // previews play muted when AUTOPLAY is on, else show a still + ▶ — except the selected one, which plays.
-                // Only the big video has sound.
-                allowVideo={big || autoplay || i === selected}
-                muted={muted || !big}
+                // One video has sound (see `muted` below).
+                allowVideo={big || i === selected || (autoplay && playable.has(i))}
+                // Sound goes to one video: the pinned / full-view one, or with nothing pinned the selected preview.
+                muted={muted || !(big || (!pinned && !solo && i === selected))}
               />
             </div>
           );

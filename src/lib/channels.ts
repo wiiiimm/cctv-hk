@@ -1,6 +1,6 @@
 import tdCameras from "../data/td-cameras.json";
 import { HKO_STATIONS } from "../data/hko-stations";
-import { LIVE_STREAMS, NEWS_STREAMS, SPACE_STREAMS, WORLD_STREAMS } from "../data/streams";
+import { LIVE_STREAMS, NEWS_STREAMS, RECORDING_SOURCES, SPACE_STREAMS, WORLD_STREAMS } from "../data/streams";
 
 export type FeedKind = "td" | "hko" | "yt";
 
@@ -18,6 +18,10 @@ export interface Channel {
   district: string;
   districtZh: string;
   geo?: { lat: number; lon: number; approx: boolean };
+  /** YouTube channel id to follow (its current live video is resolved at runtime); `code` is then a placeholder. */
+  follow?: string;
+  /** Recording slot: play the followed channel's Nth (0-based) most recent recording rather than its live stream. */
+  recIndex?: number;
   /** How often the source publishes a new picture. */
   refreshMs: number;
 }
@@ -36,6 +40,25 @@ const REGION_ORDER = ["Hong Kong Island", "Kowloon", "New Territories"];
 function build(): Channel[] {
   const out: Channel[] = [];
   // Bank 1xx: HK live video. 2xx: HKO weather. 3xx: world live video. 4xx: news & finance. 5xx: space. 1000+: traffic.
+  // Bank 6xx: recorded-news slots (see RECORDING_SOURCES).
+  for (const r of RECORDING_SOURCES)
+    for (let k = 0; k < r.slots; k++)
+      out.push({
+        key: `yt:rec-${r.slug}-${k + 1}`,
+        num: r.base + k,
+        kind: "yt",
+        code: `rec-${r.slug}-${k + 1}`,
+        follow: r.follow,
+        recIndex: k,
+        name: `${r.name} recording ${k + 1}`,
+        nameZh: `${r.nameZh} 重溫 ${k + 1}`,
+        region: "Recorded",
+        regionZh: "重溫",
+        district: r.name,
+        districtZh: r.nameZh,
+        geo: r.lat != null && r.lon != null ? { lat: r.lat, lon: r.lon, approx: true } : undefined,
+        refreshMs: 0,
+      });
   SPACE_STREAMS.forEach((s) =>
     out.push({
       key: `yt:${s.id}`,
@@ -58,10 +81,11 @@ function build(): Channel[] {
       num: s.num,
       kind: "yt",
       code: s.id,
+      follow: s.follow,
       name: s.name,
       nameZh: s.nameZh,
-      region: "News",
-      regionZh: "新聞",
+      region: s.racing ? "Racing" : "News",
+      regionZh: s.racing ? "賽馬" : "新聞",
       district: s.country,
       districtZh: s.countryZh,
       geo: s.lat != null && s.lon != null ? { lat: s.lat, lon: s.lon, approx: true } : undefined,
@@ -74,6 +98,7 @@ function build(): Channel[] {
       num: s.num,
       kind: "yt",
       code: s.id,
+      follow: s.follow,
       name: s.name,
       nameZh: s.nameZh,
       region: "Live video",
@@ -151,7 +176,7 @@ function locate(channels: Channel[]): Channel[] {
   const td = channels.filter((c) => c.kind === "td" && c.geo);
   return channels.map((c) => {
     // Only Hong Kong feeds take the nearest HK district; world / news / space keep their own country / place.
-    if (c.kind === "td" || !c.geo || ["World", "News", "Space"].includes(c.region)) return c;
+    if (c.kind === "td" || !c.geo || ["World", "News", "Space", "Racing", "Recorded"].includes(c.region)) return c;
     let best = td[0];
     let bestD = Infinity;
     for (const t of td) {
@@ -225,14 +250,14 @@ const TOPICS: { id: string; label: string; labelZh: string; keys: string[]; matc
     id: "harbour",
     label: "Victoria Harbour",
     labelZh: "維多利亞港",
-    keys: ["hko:HK2", "hko:HKO", "hko:IC1", "hko:IC2", "hko:CP1", "hko:HMM", "hko:DNL", "hko:SWH", "yt:XN-ArdUrqtc", "yt:Z8NTLkEFZjg"],
+    keys: ["hko:HK2", "hko:HKO", "hko:IC1", "hko:IC2", "hko:CP1", "hko:HMM", "hko:DNL", "hko:SWH", "yt:XN-ArdUrqtc", "yt:Z8NTLkEFZjg", "yt:follow-shunshunlee"],
     match: /Cross Harbour|Western Harbour|Eastern Harbour|Harbour Road|Gloucester Road|Connaught Road/,
   },
   {
     id: "peak",
     label: "Peak & skyline",
     labelZh: "山頂及天際線",
-    keys: ["hko:VPA", "hko:VPB", "hko:GSI", "hko:HK2", "hko:IC1", "hko:IC2", "hko:KLT", "yt:TIYZVyzOk4k"],
+    keys: ["hko:VPA", "hko:VPB", "hko:GSI", "hko:HK2", "hko:IC1", "hko:IC2", "hko:KLT"],
   },
   {
     // Airport trackers, the HZMB port, the TM-CLK tunnel's southern portal (which lands at it; the Tuen Mun end is
@@ -242,9 +267,11 @@ const TOPICS: { id: string; label: string; labelZh: string; keys: string[]; matc
     id: "airport",
     label: "Airport & HZMB",
     labelZh: "機場及港珠澳大橋",
-    keys: ["yt:ygC5wni2DMQ", "yt:JPREngCARsA", "yt:ZbUAX0ZvTZI"],
+    keys: ["yt:ygC5wni2DMQ", "yt:ZbUAX0ZvTZI", "yt:follow-hkairportlivecam"],
     match: /HZMB|TM-CLK Tunnel Southern Portal|Tung Wing Road|North Lantau Highway near (Tung Chung|Caribbean Coast|Ying Tung)/,
   },
+  // Live dashcams of Hong Kong taxis on shift (followed channels: live when driving, else a recent drive).
+  { id: "taxi", label: "Taxi cams", labelZh: "的士直播", keys: ["yt:follow-dicgor", "yt:follow-hktaxico"] },
   { id: "tunnels", label: "Tunnels", labelZh: "隧道", keys: [], match: /Tunnel/ },
   { id: "bridges", label: "Bridges", labelZh: "橋樑", keys: [], match: /Bridge|Tsing Ma|Ting Kau|Stonecutters|Kap Shui Mun|Lantau Link/ },
   { id: "border", label: "Border crossings", labelZh: "邊境口岸", keys: [], match: /Shenzhen Bay|Heung Yuen Wai|HZMB|Man Kam To|Lok Ma Chau|Lo Wu|San Tin/ },
@@ -256,9 +283,15 @@ const TOPICS: { id: string; label: string; labelZh: string; keys: string[]; matc
   },
 ];
 
-const newsKeys = (f: (s: (typeof NEWS_STREAMS)[number]) => boolean) => NEWS_STREAMS.filter(f).map((s) => `yt:${s.id}`);
+// Horse racing lives in its own group only, never in the news groups.
+const newsKeys = (f: (s: (typeof NEWS_STREAMS)[number]) => boolean) =>
+  NEWS_STREAMS.filter((s) => !s.racing && f(s))
+    .sort((a, b) => a.num - b.num)
+    .map((s) => `yt:${s.id}`);
 function newsGroups(): ChannelGroup[] {
   return [
+    { id: "news:hk", section: "news", label: "Hong Kong news", labelZh: "香港新聞", keys: newsKeys((s) => s.country === "Hong Kong") },
+    { id: "news:rec", section: "news", label: "Hong Kong news recordings", labelZh: "香港新聞重溫", keys: CHANNELS.filter((c) => c.region === "Recorded").map((c) => c.key) },
     { id: "news", section: "news", label: "All news", labelZh: "所有新聞", keys: newsKeys(() => true) },
     { id: "news:zh", section: "news", label: "Chinese-language news", labelZh: "中文新聞", keys: newsKeys((s) => s.lang === "cmn" || s.lang === "yue") },
     { id: "news:en", section: "news", label: "English news", labelZh: "英語新聞", keys: newsKeys((s) => s.lang === "en") },
@@ -274,11 +307,19 @@ function buildGroups(): ChannelGroup[] {
   const groups: ChannelGroup[] = [
     { id: "featured", section: "type", label: "Featured", labelZh: "精選", keys: featured() },
     { id: "all", section: "type", label: "All channels", labelZh: "所有頻道", keys: keysOf(CHANNELS) },
-    { id: "kind:yt", section: "type", label: "Live video", labelZh: "直播影像", keys: keysOf(CHANNELS.filter((c) => c.kind === "yt" && !["World", "News", "Space"].includes(c.region))) },
+    { id: "kind:yt", section: "type", label: "Live video", labelZh: "直播影像", keys: keysOf(CHANNELS.filter((c) => c.kind === "yt" && !["World", "News", "Space", "Racing", "Recorded"].includes(c.region))) },
     { id: "world", section: "type", label: "World live", labelZh: "世界直播", keys: keysOf(CHANNELS.filter((c) => c.region === "World")) },
     { id: "space", section: "type", label: "Space", labelZh: "太空直播", keys: keysOf(CHANNELS.filter((c) => c.region === "Space")) },
     // News & finance (bank 4xx), by audience.
     ...newsGroups(),
+    // Horse racing (bank 4xx too, but not news): its own group, listed with the topics.
+    {
+      id: "racing",
+      section: "topic",
+      label: "Horse racing",
+      labelZh: "賽馬",
+      keys: NEWS_STREAMS.filter((s) => s.racing).sort((a, b) => a.num - b.num).map((s) => `yt:${s.id}`),
+    },
     { id: "kind:hko", section: "type", label: "HKO weather", labelZh: "天文台天氣", keys: keysOf(CHANNELS.filter((c) => c.kind === "hko")) },
     { id: "kind:td", section: "type", label: "Traffic", labelZh: "交通", keys: keysOf(CHANNELS.filter((c) => c.kind === "td")) },
   ];
@@ -315,7 +356,8 @@ export function snapshotUrl(ch: Channel, hd = false): string | null {
   }
 }
 
-export function youtubeEmbed(id: string, muted: boolean): string {
+/** Player URL. `playlist`: play these after `id` and loop (replays of a followed channel's latest uploads). */
+export function youtubeEmbed(id: string, muted: boolean, playlist?: string[]): string {
   const q = new URLSearchParams({
     autoplay: "1",
     mute: muted ? "1" : "0",
@@ -328,7 +370,13 @@ export function youtubeEmbed(id: string, muted: boolean): string {
     enablejsapi: "1",
     origin: typeof location !== "undefined" ? location.origin : "",
   });
-  return `https://www.youtube-nocookie.com/embed/${id}?${q}`;
+  if (playlist?.length) {
+    q.set("playlist", playlist.join(","));
+    q.set("loop", "1");
+  }
+  // Standard embed host: some broadcasters' videos (RTHK / TVB uploads) refuse the privacy-enhanced youtube-nocookie.com
+  // player but play on www.youtube.com.
+  return `https://www.youtube.com/embed/${id}?${q}`;
 }
 
 export const fmtNum = (n: number) => String(n).padStart(4, "0");
@@ -337,3 +385,10 @@ export const fmtNum = (n: number) => String(n).padStart(4, "0");
 export function feedAspect(ch: Channel | undefined): number {
   return !ch || ch.kind === "td" ? 4 / 3 : 16 / 9;
 }
+
+/**
+ * At most this many YouTube previews play at once (the pinned / full-view and selected videos always play on top).
+ * YouTube refuses bursts of simultaneous players — a 30-tile group of streams would otherwise come up as "blocked" —
+ * and it is heavy on the machine; the other previews show their still with ▶.
+ */
+export const MAX_PLAYING_PREVIEWS = 8;

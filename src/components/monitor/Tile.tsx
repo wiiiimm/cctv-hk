@@ -28,14 +28,16 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
   const lang = useStore((s) => s.lang);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const willPlay = ch?.kind === "yt" && allowVideo && !!snap.live;
-  useYouTubeErrors(frameRef, channelKey, willPlay);
+  // Players load muted (autoplay is allowed); the hook starts playback and unmutes the one that should have sound.
+  useYouTubeErrors(frameRef, channelKey, willPlay, !muted);
   if (!ch) return <div className="tile" />;
 
   const isVideo = ch.kind === "yt";
   const playing = isVideo && allowVideo && snap.live;
   const noSignal = snap.status === "error" || snap.status === "offline";
   const stale = !isVideo && snap.takenAt && now - snap.takenAt > ch.refreshMs * 3;
-  const name = chName(ch, lang);
+  // Recording slots show the recording's own title, with the slot name ("無綫新聞 重溫 1") as the second line.
+  const name = snap.title ?? chName(ch, lang);
 
   return (
     <div
@@ -66,7 +68,7 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
         <iframe
           ref={frameRef}
           className="tile-media"
-          src={youtubeEmbed(ch.code, muted)}
+          src={youtubeEmbed(snap.videoId ?? ch.code, true, snap.replay ? snap.playlist : undefined)}
           title={name}
           allow="autoplay; encrypted-media; picture-in-picture"
           referrerPolicy="strict-origin-when-cross-origin"
@@ -101,7 +103,7 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
           </div>
           <div className="osd osd-tr">
             {isVideo ? (
-              snap.live ? <span className="badge">{t.live}</span> : null
+              snap.live ? <span className={`badge${snap.replay ? " replay" : ""}`}>{snap.replay ? t.replay : t.live}</span> : null
             ) : (
               <span className={`badge${stale ? " stale" : ""}`}>{stale ? t.stale : t.rec}</span>
             )}
@@ -109,7 +111,7 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
           <div className="osd osd-bottom">
             <span className="osd-title">
               <span className="osd-name">{name}</span>
-              <span className="osd-alt">{chAltName(ch, lang)}</span>
+              <span className="osd-alt">{snap.title ? chName(ch, lang) : chAltName(ch, lang)}</span>
               {/* Phones: area + picture time inside the caption block (the separate stamp is hidden there). */}
               <span className="osd-meta">
                 {chDistrict(ch, lang)} · {isVideo ? hkTime(now) : snap.takenAt ? hkTime(snap.takenAt) : "--"}
@@ -117,7 +119,7 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
               </span>
             </span>
             <span className="osd-stamp">
-              {isVideo ? hkStamp(now) : snap.takenAt ? hkStamp(snap.takenAt) : "--"}
+              {isVideo && !(snap.replay && snap.title && snap.takenAt) ? hkStamp(now) : snap.takenAt ? hkStamp(snap.takenAt) : "--"}
               {!isVideo && snap.takenAt ? <span className="age"> +{ago(snap.takenAt, now)}</span> : null}
             </span>
           </div>

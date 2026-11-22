@@ -189,7 +189,7 @@ function drawCell(ctx: CanvasRenderingContext2D, key: string, x: number, y: numb
     caption(ctx, t.kind[ch.kind].toUpperCase(), x + pad + tw + fs * 0.7, y + pad * 0.6, fs);
   } else caption(ctx, `CH${fmtNum(ch.num)} ${t.kind[ch.kind].toUpperCase()}`, x + pad, y + pad * 0.6, fs);
   if (ch.kind === "yt") {
-    if (snap.live) badge(ctx, t.live, x + w - pad, y + pad * 0.6, fs, "#d71f1f", !!phoneMq?.matches && !big);
+    if (snap.live) badge(ctx, snap.replay ? t.replay : t.live, x + w - pad, y + pad * 0.6, fs, snap.replay ? "#c27c00" : "#d71f1f", !!phoneMq?.matches && !big);
   } else {
     const stale = snap.takenAt && now - snap.takenAt > ch.refreshMs * 3;
     badge(ctx, stale ? t.stale : t.rec, x + w - pad, y + pad * 0.6, fs, stale ? "#c27c00" : "#d71f1f", !!phoneMq?.matches && !big);
@@ -198,13 +198,16 @@ function drawCell(ctx: CanvasRenderingContext2D, key: string, x: number, y: numb
   ctx.font = `${fs}px ${OSD}`;
   // Small cells: name and stamp share the bottom line, so the name gets whatever the stamp leaves.
   // Big (focused) view: name line above, stamp line below.
-  const stamp = ch.kind === "yt" ? hkStamp(now) : snap.takenAt ? hkStamp(snap.takenAt) : "----/--/-- --:--:--";
+  // Recording slots: when it aired, not now.
+  const recorded = ch.kind === "yt" && snap.replay && snap.title && snap.takenAt;
+  const stamp = ch.kind === "yt" && !recorded ? hkStamp(now) : snap.takenAt ? hkStamp(snap.takenAt) : "----/--/-- --:--:--";
   const showStamp = big || w > 260;
   const stampW = showStamp && !big ? ctx.measureText(stamp).width + pad : 0;
   const room = w - pad * 2 - stampW - (big ? w * 0.3 : 0);
   // Primary language always; the other language too when it fits.
-  const both = `${chName(ch, lang)}  ${chAltName(ch, lang)}`;
-  let label = ctx.measureText(both).width <= room ? both : chName(ch, lang);
+  const primary = snap.title ?? chName(ch, lang);
+  const both = `${primary}  ${snap.title ? chName(ch, lang) : chAltName(ch, lang)}`;
+  let label = ctx.measureText(both).width <= room ? both : primary;
   const full = label;
   while (label.length > 2 && ctx.measureText(label + "…").width > room) label = label.slice(0, -1);
   if (label !== full) label += "…";

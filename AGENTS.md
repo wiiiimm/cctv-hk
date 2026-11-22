@@ -6,7 +6,7 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
 ## Architecture
 
 - `src/lib/store.ts` — the single viewing engine (layout n×m, cells, selection, focus, patrol, mode). Both UIs drive it.
-- `src/lib/channels.ts` — every feed as a numbered `Channel`: 1xx HK YouTube live, 2xx HKO weather, 3xx world YouTube live ("World live" group), 4xx 24/7 news & finance, 5xx space ("Space" group) ("News & finance" picker section: by language, Taiwan, Asia-Pacific, international, finance), 1001+ TD traffic. Stream numbers are fixed in `data/streams.ts`.
+- `src/lib/channels.ts` — every feed as a numbered `Channel`: 1xx HK YouTube live, 2xx HKO weather, 6xx recorded-news slots, 3xx world YouTube live ("World live" group), 4xx 24/7 news & finance, 5xx space ("Space" group) ("News & finance" picker section: by language, Taiwan, Asia-Pacific, international, finance), 1001+ TD traffic. Stream numbers are fixed in `data/streams.ts`.
 - `src/lib/snapshots.ts` — one poller per visible feed; fetches blobs so the DOM gets object URLs and the CRT gets ImageBitmaps (no tainted canvas).
 - Console mode: `components/monitor/*` (DOM wall) + `components/deck/*` (guide, focus panel with mini-map).
 - CRT is a picture mode of the same viewer (no device shell): `components/crt/CrtScreen.tsx` replaces the DOM wall in the stage.
@@ -69,12 +69,25 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   broadcaster's base / the country's main city; feeds with no single place (ISS, world rotations) have none. Only HK
   feeds take the nearest HK district (`locate`); world / news / space keep their country / place. In CRT the map inset
   sits bottom-right on a YouTube video (top-left otherwise).
+- Followed channels (`follow: <channel id>` on a stream, e.g. 452 Cable News / HOY 78): for channels that stream
+  bulletins as new videos. `/api/ytlive?ch=` (allow-listed, cached 60s in-process and at the CDN) reads the channel's
+  /live page and returns the current live video id; snapshots store it as `Snap.videoId`, which embeds / stills use.
+  When nothing (playable) is live it replays the channel's uploads from the last 48 hours (official RSS) filtered by
+  `replayMatch`,
+  as a looping playlist with a REPLAY badge — also when a live stream is blocked here. `liveOnly` (webcams) never
+  replays: OFF AIR instead. Used for TVB / RTHK / Cable News, HOY programmes, taxi dashcams, a harbour cam, racing. Racing (4xx, `racing: true`)
+  is never in the news groups: region "Racing", its own "Horse racing" topic group.
+- Recorded news (bank 6xx, `RECORDING_SOURCES`): numbered slots (TVB 601–610, Cable 611–620, RTHK 621–630) that hold
+  a followed channel's Nth most recent recording from the same news / last-48h list (`Channel.recIndex`). Tiles show
+  the recording's title (`Snap.title`) and air time; empty slots are OFF AIR. Group "Hong Kong news recordings / 香港新聞重溫", right under "Hong Kong news".
+- Channel list rows for video channels show the state (LIVE / REPLAY / OFF AIR / N/A) via `useListStatus`, which
+  never starts polling: on-wall snapshot, else the followed channel's cached lookup, else a 24/7 stream is assumed live.
 - YouTube off-air reasons (`Snap.reason`): "offair" = not broadcasting (OFF AIR); "blocked" = the owner won't let it
   play here (UNAVAILABLE + "May be region-restricted").
 - CRT veil: the live layers (players, flat overlay, flat ticker) hide during power-on (mount / refresh / entering CRT)
   and whole-wall changes (page, group) so the warm-up / static shows, then fade in; picture-mode changes don't veil.
 - AUTOPLAY toggle (`autoplay`, URL `autoplay=0`): off = YouTube previews show a still (refreshed each liveness
-  check) with ▶; the pinned / full-view and the selected video always play (DOM `allowVideo`, CRT `videoCells`).
+  check) with ▶; the pinned / full-view and the selected video always play; sound goes to the pinned / full-view video, or with nothing pinned to the selected one (MUTED still wins) (DOM `allowVideo`, CRT `videoCells`).
 - CURVE toggle (`crtCurve`, URL `curve=0`): off = every CRT effect but no barrel distortion; `crtCurvature()` returns 0
   (set via `setCrtCurve`, kept in step by CrtScreen), and the ticker always goes through the shader.
   Toggle: NEWS (`news`, URL `news=0`).

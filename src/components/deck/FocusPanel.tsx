@@ -25,7 +25,7 @@ export function FocusPanel({ compact = false }: { compact?: boolean }) {
 
   const source = { td: t.srcTd, hko: t.srcHko, yt: t.srcYt }[ch.kind];
   const status =
-    snap.status === "ok" ? (ch.kind === "yt" ? t.stLive : t.stOk) : { loading: t.stLoading, error: t.stError, offline: t.stOffline }[snap.status];
+    snap.status === "ok" ? (ch.kind === "yt" ? (snap.replay ? t.stReplay : t.stLive) : t.stOk) : { loading: t.stLoading, error: t.stError, offline: t.stOffline }[snap.status];
 
   return (
     <section className={`panel${compact ? " compact" : ""}`} aria-label={t.selected}>
@@ -39,8 +39,8 @@ export function FocusPanel({ compact = false }: { compact?: boolean }) {
           </button>
         )}
       </header>
-      <h2 className="panel-title">{chName(ch, lang)}</h2>
-      <p className="panel-alt">{chAltName(ch, lang)}</p>
+      <h2 className="panel-title">{snap.title ?? chName(ch, lang)}</h2>
+      <p className="panel-alt">{snap.title ? `${chName(ch, lang)} · ${hkStamp(snap.takenAt ?? now)}` : chAltName(ch, lang)}</p>
       <dl className="panel-meta">
         {!compact && (
           <>

@@ -312,6 +312,10 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .guide-row:focus-visible { outline-offset: -2px; }
 .guide-row .num { color: var(--muted); font: var(--fs-md) var(--mono); font-variant-numeric: tabular-nums; }
 .guide-row .kind { justify-self: stretch; text-align: center; padding-inline: 2px; }
+/* Video rows show their state: LIVE red (like the tile badge), REPLAY amber, OFF AIR / UNAVAILABLE dim. */
+.kind-yt.st-live { color: var(--rec); }
+.kind-yt.st-replay { color: #e0a030; }
+.kind-yt.st-offair, .kind-yt.st-blocked { color: var(--dim); }
 .guide-row .label { min-width: 0; display: grid; gap: 1px; }
 .guide-row .nm, .guide-row .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .guide-row .nm { font-weight: 500; }
@@ -322,6 +326,9 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .fav.grp { width: 28px; display: inline-grid; place-items: center; }
 .fav.grp svg { width: 14px; height: 14px; }
 .fav.grp.open { color: var(--text); }
+/* ↗ to the exact YouTube video a followed channel / recording row is showing. */
+.fav.yt-link { width: 28px; display: inline-grid; place-items: center; text-decoration: none; font-size: 14px; }
+.guide-row .now-title { color: var(--muted); }
 .fav:focus-visible { outline-offset: -4px; }
 .empty { padding: 20px var(--sp-3); color: var(--dim); }
 
@@ -402,7 +409,7 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 @container (min-width: 300px) and (min-height: 200px) { .osd-alt { display: block; } }
 /* Steady status badge: red with white text (amber when the picture is stale). No blinking. */
 .osd .badge { background: #d71f1f; color: #fff; padding: 1px 5px 2px; text-shadow: none; letter-spacing: 0.04em; }
-.osd .badge.stale { background: #c27c00; }
+.osd .badge.stale, .osd .badge.replay { background: #c27c00; }
 .osd .age { color: var(--sel); }
 .tile-play { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; color: rgba(255, 255, 255, 0.8); text-shadow: 0 0 12px #000; pointer-events: none; }
 @container (max-width: 300px) { .osd-stamp { display: none; } }

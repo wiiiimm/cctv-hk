@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed } from "../../lib/channels";
+import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed, MAX_PLAYING_PREVIEWS } from "../../lib/channels";
 import { getSnap, retain, useSnap } from "../../lib/snapshots";
 import { lastTouchAt } from "../../hooks/useWallGestures";
 import { CRT_NEWS_H, useNews, type NewsItem } from "../../lib/news";
@@ -46,7 +46,7 @@ function CrtYouTube({ chKey, rect, muted, big, preset, switchedAt, veiled }: { c
   const snap = useSnap(ch, big);
   const lang = useStore((s) => s.lang);
   const frameRef = useRef<HTMLIFrameElement>(null);
-  useYouTubeErrors(frameRef, chKey, !!ch && ch.kind === "yt" && !!snap.live);
+  useYouTubeErrors(frameRef, chKey, !!ch && ch.kind === "yt" && !!snap.live, !muted);
   const [burst, setBurst] = useState(false);
   useEffect(() => {
     if (!switchedAt || Date.now() - switchedAt > 400) return;
@@ -57,7 +57,7 @@ function CrtYouTube({ chKey, rect, muted, big, preset, switchedAt, veiled }: { c
   if (!ch || ch.kind !== "yt" || !snap.live) return null;
   return (
     <div className={`crt-video${big ? " big" : ""}${veiled ? " veiled" : ""}`} style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ...videoLook(preset) }}>
-      <iframe ref={frameRef} src={youtubeEmbed(ch.code, muted)} title={chName(ch, lang)} allow="autoplay; encrypted-media" referrerPolicy="strict-origin-when-cross-origin" />
+      <iframe ref={frameRef} src={youtubeEmbed(snap.videoId ?? ch.code, true, snap.replay ? snap.playlist : undefined)} title={chName(ch, lang)} allow="autoplay; encrypted-media" referrerPolicy="strict-origin-when-cross-origin" />
       {preset.mono > 0 && <div className="cv-layer cv-glow" />}
       <div className="cv-layer cv-scan" />
       {preset.mask === 1 && <div className="cv-layer cv-grille" />}
@@ -81,8 +81,17 @@ function videoCells(s: { cells: string[]; pinned: boolean; focused: boolean; sel
   const isLiveYt = (key: string) => CHANNEL_BY_KEY.get(key)?.kind === "yt" && !!getSnap(key).live;
   if (s.focused) return isLiveYt(s.cells[s.selected]) ? [s.selected] : [];
   const out: number[] = [];
-  // The pinned and the selected video always play; other previews only with AUTOPLAY on (else the canvas draws a still).
-  for (let i = 0; i < Math.min(shown, s.cells.length); i++) if (isLiveYt(s.cells[i]) && (s.autoplay || (s.pinned && i === 0) || i === s.selected)) out.push(i);
+  // The pinned and the selected video always play; other previews only with AUTOPLAY on, and at most
+  // MAX_PLAYING_PREVIEWS of them (else the canvas draws a still).
+  let previews = 0;
+  for (let i = 0; i < Math.min(shown, s.cells.length); i++) {
+    if (!isLiveYt(s.cells[i])) continue;
+    if ((s.pinned && i === 0) || i === s.selected) out.push(i);
+    else if (s.autoplay && previews < MAX_PLAYING_PREVIEWS) {
+      out.push(i);
+      previews++;
+    }
+  }
   return out;
 }
 
@@ -401,7 +410,7 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
         const big = pin.focused || (pin.pinned && i === 0);
         const hit = switchedCell === -1 || switchedCell === i;
         return (
-          <CrtYouTube key={`${cells[i]}-${i}`} chKey={cells[i]} rect={rect} big={big} muted={muted || !big} preset={presetById(preset)} switchedAt={hit ? switchedAt : 0} veiled={veiled} />
+          <CrtYouTube key={`${cells[i]}-${i}`} chKey={cells[i]} rect={rect} big={big} muted={muted || !(big || (!pin.pinned && !pin.focused && i === selected))} preset={presetById(preset)} switchedAt={hit ? switchedAt : 0} veiled={veiled} />
         );
       })}
       <div ref={overHostRef} className={`crt-overlay-host${veiled ? " veiled" : ""}`} aria-hidden />

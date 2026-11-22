@@ -205,6 +205,18 @@ export function feedCount(s: State): number {
  * Resize the cell list to `n`: keep what is on screen, then continue through the group. A channel is never
  * shown twice; if the group runs out, the remaining slots stay empty.
  */
+/**
+ * Put `key` into cell `at`. If that channel is already showing in another cell, the two cells swap (the other cell
+ * takes what `at` was showing), so the wall never shows a channel twice.
+ */
+function placeKey(cells: string[], at: number, key: string): string[] {
+  const out = [...cells];
+  const already = out.indexOf(key);
+  if (already >= 0 && already !== at) out[already] = out[at];
+  out[at] = key;
+  return out;
+}
+
 function fillCells(s: State, cells: string[], n: number): string[] {
   const keys = groupKeys(s);
   const out = [...new Set(cells)].slice(0, n);
@@ -365,16 +377,14 @@ export const actions = {
   },
   channelStep(dir: number) {
     update((s) => {
-      const cells = [...s.cells];
       const at = target(s);
-      cells[at] = stepIn(groupKeys(s), cells[at], dir);
+      const cells = placeKey(s.cells, at, stepIn(groupKeys(s), s.cells[at], dir));
       return { cells, selected: at, switchedAt: Date.now(), switchedCell: at };
     });
   },
   assign(index: number, key: string) {
     update((s) => {
-      const cells = [...s.cells];
-      cells[index] = key;
+      const cells = placeKey(s.cells, index, key);
       return { cells, selected: index, switchedAt: Date.now(), switchedCell: index };
     });
   },
