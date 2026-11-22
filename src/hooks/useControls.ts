@@ -14,7 +14,14 @@ export function useControls() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.closest("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Text boxes keep every key (arrows move the caret there).
+      if (t.closest("textarea, [contenteditable=''], [contenteditable='true'], input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button])")) return;
+      // Arrow keys always pick the channel — never the focused control's own behaviour (the group dropdown, the
+      // preview-size slider, a scrolling list). The control lets go of focus so the next keys go to the wall too.
+      const arrow = e.key.startsWith("Arrow");
+      if (!arrow && t.closest("select, input")) return;
+      if (arrow && t !== document.body && t.closest("select, input, button, a, [tabindex]")) (t as HTMLElement).blur?.();
       const s = store.get();
       const single = s.focused || s.cells.length === 1;
       let handled = true;
@@ -121,9 +128,11 @@ export function useControls() {
         }
       if (handled) e.preventDefault();
     };
-    window.addEventListener("keydown", onKey);
+    // Capture phase: runs before any control's own handler, so the arrows' default (change the dropdown / slider,
+    // scroll) can be cancelled.
+    window.addEventListener("keydown", onKey, { capture: true });
     return () => {
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey, { capture: true });
     };
   }, []);
 
