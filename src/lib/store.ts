@@ -6,6 +6,8 @@ import { PREVIEW_DEFAULT, PREVIEW_MAX, PREVIEW_MIN, PREVIEW_STEP, liveGeometry, 
 export type Mode = "console" | "crt";
 export type Lang = "en" | "zh";
 
+export type PatrolMode = "rolling" | "page" | "pinned";
+
 export interface CustomGroup {
   id: string;
   name: string;
@@ -34,6 +36,12 @@ export interface State {
   page: number;
   patrol: boolean;
   patrolSec: number;
+  /**
+   * How the sequence (patrol) advances each tick: "rolling" swaps one preview at a time for the next camera not on
+   * screen; "page" flips all previews to the next page; "pinned" moves the next camera into the pinned slot and
+   * refills the previews with the cameras after it (an up-next queue).
+   */
+  patrolMode: PatrolMode;
   mode: Mode;
   crtPreset: string;
   lang: Lang;
@@ -51,7 +59,7 @@ export interface State {
 }
 
 const STORAGE_KEY = "cctv-hk:v1";
-const PERSIST: (keyof State)[] = ["previewSize", "pinMode", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "customGroups", "patrolSec", "muted"];
+const PERSIST: (keyof State)[] = ["previewSize", "pinMode", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "customGroups", "patrolSec", "patrolMode", "muted"];
 
 function groupKeys(s: Pick<State, "groupId" | "favourites" | "customGroups">): string[] {
   if (s.groupId === "favourites") return s.favourites.length ? s.favourites : GROUP_BY_ID.get("featured")!.keys;
@@ -81,6 +89,7 @@ function initial(): State {
     page: 0,
     patrol: false,
     patrolSec: 15,
+    patrolMode: "rolling",
     mode: "console",
     crtPreset: "trinitron",
     lang: typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en",
@@ -105,6 +114,7 @@ function initial(): State {
   if (base.groupId.startsWith("custom:") && !base.customGroups.some((g) => `custom:${g.id}` === base.groupId)) base.groupId = "featured";
   if (!base.pinned) base.focused = false;
   base.previewSize = clampPreview(Number(base.previewSize) || PREVIEW_DEFAULT);
+  if (!["rolling", "page", "pinned"].includes(base.patrolMode)) base.patrolMode = "rolling";
   if (base.pinMode !== "wide" && base.pinMode !== "side") base.pinMode = "side";
   // Restore the saved wall, but only channels that belong to the current group (no duplicates). A saved pin that
   // isn't in the group is released — the same rule as switching group.
@@ -190,6 +200,14 @@ const clampPreview = (px: number) => Math.max(PREVIEW_MIN, Math.min(PREVIEW_MAX,
  */
 let wallCapacity = 0;
 const capacityOr = (fallback: number) => (wallCapacity > 0 ? wallCapacity : fallback);
+
+// Sequence (patrol) bookkeeping: rolling cursor through the group, next slot to replace, and the time of the last
+// automatic change (so manual changes can restart the dwell timer).
+let rollCursor = 0;
+let rollSlot = 0;
+let lastTick = 0;
+/** When the last automatic sequence change happened (to tell it apart from manual changes). */
+export const lastSequenceTick = () => lastTick;
 
 /** The cell an action applies to: the selection, else the pinned video, else the first tile. */
 const target = (s: State) => (s.selected >= 0 ? s.selected : 0);
@@ -301,10 +319,11 @@ export const actions = {
       const keys = groupKeys(s);
       const fixed = s.pinned ? 1 : 0; // the pinned video stays; only previews page
       const n = Math.max(1, capacityOr(s.cells.length) - fixed);
-      const pages = Math.max(1, Math.ceil(keys.length / n));
-      const page = (s.page + dir + pages) % pages;
-      const cells = [...s.cells.slice(0, fixed), ...pageCells(keys, page, n)];
-      return { page, cells, switchedAt: Date.now(), switchedCell: -1 };
+      const pool = fixed ? keys.filter((k) => k !== s.cells[0]) : keys; // never repeat the pinned video
+      const pages2 = Math.max(1, Math.ceil(pool.length / n));
+      const page2 = (s.page + dir + pages2) % pages2;
+      const cells = [...s.cells.slice(0, fixed), ...pageCells(pool, page2, n)];
+      return { page: page2, cells, switchedAt: Date.now(), switchedCell: -1 };
     });
   },
   channelStep(dir: number) {
@@ -440,6 +459,57 @@ export const actions = {
         g.id !== id ? g : { ...g, keys: g.keys.includes(key) ? g.keys.filter((k) => k !== key) : [...g.keys, key] },
       ),
     }));
+  },
+  setPatrolMode(patrolMode: PatrolMode) {
+    update({ patrolMode });
+  },
+  /** One sequence (patrol) step, per the current mode. Does nothing when the whole group is already on screen. */
+  sequenceTick() {
+    const s = get();
+    const keys = groupKeys(s);
+    const fixed = s.pinned ? 1 : 0;
+    const slots = Math.max(0, capacityOr(s.cells.length) - fixed);
+    if (s.patrolMode === "pinned") {
+      if (keys.length < 2) return;
+      if (!s.pinned) actions.pin(target(s));
+      update((st) => {
+        const i = keys.indexOf(st.cells[0]);
+        const next = keys[(i + 1 + keys.length) % keys.length];
+        const queue: string[] = [];
+        for (let k = 1; k < keys.length && queue.length < slots; k++) {
+          const key = keys[(keys.indexOf(next) + k) % keys.length];
+          if (key !== next) queue.push(key);
+        }
+        return { cells: [next, ...queue], selected: 0, switchedAt: (lastTick = Date.now()), switchedCell: 0 };
+      });
+      return;
+    }
+    // Rolling / page only make sense when the group has more cameras than the preview slots.
+    const pool = fixed ? keys.filter((k) => k !== s.cells[0]) : keys;
+    if (pool.length <= slots) return;
+    if (s.patrolMode === "page") {
+      lastTick = Date.now();
+      actions.pageStep(1);
+      update({ switchedAt: lastTick });
+      return;
+    }
+    // Rolling: replace the next preview slot (round-robin) with the next camera that isn't on screen.
+    update((st) => {
+      const cells = [...st.cells];
+      const slot = fixed + (rollSlot++ % Math.max(1, cells.length - fixed));
+      const onScreen = new Set(cells);
+      let pick: string | undefined;
+      for (let k = 0; k < pool.length && !pick; k++) {
+        const key = pool[(rollCursor + k) % pool.length];
+        if (!onScreen.has(key)) {
+          pick = key;
+          rollCursor = (rollCursor + k + 1) % pool.length;
+        }
+      }
+      if (!pick || slot >= cells.length) return {};
+      cells[slot] = pick;
+      return { cells, switchedAt: (lastTick = Date.now()), switchedCell: slot };
+    });
   },
   togglePatrol() {
     update((s) => ({ patrol: !s.patrol }));

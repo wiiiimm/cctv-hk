@@ -1,4 +1,4 @@
-import { actions, useStore } from "../../lib/store";
+import { actions, useStore, type PatrolMode } from "../../lib/store";
 import { PRESETS } from "../../lib/crt/presets";
 import { PREVIEW_MAX, PREVIEW_MIN, PREVIEW_STEP } from "../../lib/arrange";
 import { useT } from "../../lib/i18n";
@@ -7,7 +7,7 @@ import { IconButton, PinModes, PinToggle } from "../PinButtons";
 import { BiggerIcon, SmallerIcon } from "../icons";
 
 export function TopBar({ onGuide }: { onGuide: () => void }) {
-  const { previewSize, cells, pinned, patrol, patrolSec, muted, mode, crtPreset, lang, theater } = useStore((s) => s);
+  const { previewSize, cells, pinned, patrol, patrolSec, patrolMode, muted, mode, crtPreset, lang, theater } = useStore((s) => s);
   const previews = Math.max(0, cells.length - (pinned ? 1 : 0));
   const t = useT();
   const now = useClock();
@@ -48,6 +48,11 @@ export function TopBar({ onGuide }: { onGuide: () => void }) {
         <button type="button" className={`pill toggle${patrol ? " on rec" : ""}`} onClick={actions.togglePatrol} title={t.patrolTitle} aria-pressed={patrol}>
           {t.patrol}
         </button>
+        <select value={patrolMode} onChange={(e) => actions.setPatrolMode(e.target.value as PatrolMode)} aria-label={t.patrolModeLabel} title={t.patrolModeTitle}>
+          <option value="rolling">{t.patrolRolling}</option>
+          <option value="page">{t.patrolPage}</option>
+          <option value="pinned">{t.patrolPinned}</option>
+        </select>
         <select value={patrolSec} onChange={(e) => actions.setPatrolSec(+e.target.value)} aria-label={t.patrolDwell}>
           {[5, 10, 15, 30, 60].map((s) => (
             <option key={s} value={s}>{s}s</option>

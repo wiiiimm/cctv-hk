@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { actions, store } from "../lib/store";
+import { actions, lastSequenceTick, store } from "../lib/store";
 import { PRESET_IDS } from "../lib/crt/presets";
 
 function cyclePreset(dir: number) {
@@ -111,21 +111,32 @@ export function useControls() {
     };
   }, []);
 
-  // Patrol: re-arm whenever it is toggled or the dwell time changes.
+  // Sequence (patrol): one tick per dwell period — for "rolling", one preview per (dwell / previews) so each slot
+  // is refreshed once per dwell. Re-armed when toggled, when the mode / dwell / wall size changes, and after any
+  // manual change, so a manual change always gets a full dwell before the sequence moves on.
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
+    const interval = () => {
+      const s = store.get();
+      const previews = Math.max(1, s.cells.length - (s.pinned ? 1 : 0));
+      const ms = s.patrolSec * 1000;
+      return s.patrolMode === "rolling" ? Math.max(800, ms / previews) : ms;
+    };
     const arm = () => {
       clearInterval(timer);
-      const s = store.get();
-      if (s.patrol) timer = setInterval(() => actions.pageStep(1), s.patrolSec * 1000);
+      if (store.get().patrol) timer = setInterval(() => actions.sequenceTick(), interval());
     };
-    let last = `${store.get().patrol}:${store.get().patrolSec}`;
+    const sig = (s: ReturnType<typeof store.get>) => `${s.patrol}:${s.patrolSec}:${s.patrolMode}:${s.cells.length}:${s.pinned}`;
+    let last = sig(store.get());
+    let lastSwitch = store.get().switchedAt;
     arm();
     const unsub = store.subscribe(() => {
       const s = store.get();
-      const sig = `${s.patrol}:${s.patrolSec}`;
-      if (sig !== last) {
-        last = sig;
+      const now = sig(s);
+      const manual = s.switchedAt !== lastSwitch && s.switchedAt !== lastSequenceTick();
+      lastSwitch = s.switchedAt;
+      if (now !== last || manual) {
+        last = now;
         arm();
       }
     });
