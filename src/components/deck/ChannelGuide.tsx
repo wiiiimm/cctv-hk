@@ -176,7 +176,8 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
                   actions.assign(actionTarget(store.get()), c.key);
                   onPick?.();
                 }}
-                title={t.assignTitle}
+                // Hover: the full details (the row truncates them), then what a click does.
+                title={[`CH ${fmtNum(c.num)} · ${chName(c, lang)}`, chAltName(c, lang), `${chDistrict(c, lang)} · ${chDistrict(c, lang === "zh" ? "en" : "zh")}`, t.assignTitle].filter(Boolean).join("\n")}
               >
                 <span className="num">{fmtNum(c.num)}</span>
                 <KindBadge c={c} />
@@ -190,12 +191,14 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
                   {c.follow && <NowTitle c={c} />}
                 </span>
               </button>
-              {c.kind === "yt" && <YouTubeLink c={c} />}
-              {/* Add to my groups, then favourite. */}
-              <GroupMenu chKey={c.key} compact />
-              <button type="button" className={`fav${fav ? " on" : ""}`} onClick={() => actions.toggleFavourite(c.key)} aria-label={fav ? t.removeFav : t.addFav}>
-                ★
-              </button>
+              {/* Their own row under the text, right-aligned: YouTube ↗, my groups, favourite. */}
+              <span className="row-actions">
+                {c.kind === "yt" && <YouTubeLink c={c} />}
+                <GroupMenu chKey={c.key} compact />
+                <button type="button" className={`fav${fav ? " on" : ""}`} onClick={() => actions.toggleFavourite(c.key)} aria-label={fav ? t.removeFav : t.addFav} title={fav ? t.removeFav : t.addFav}>
+                  ★
+                </button>
+              </span>
             </li>
           );
         })}

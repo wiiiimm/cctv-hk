@@ -86,7 +86,7 @@ export function MiniMap({ lat, lon, approx, label }: Props) {
  * Same spots as the CRT inset: top-left under the channel label, or bottom-right above the pin buttons on a video.
  * A click folds it to a small box (no coordinates) and back; the setting is shared with the CRT (`mapMini`).
  */
-export function TileMap({ lat, lon, approx, video }: { lat: number; lon: number; approx: boolean; video: boolean }) {
+export function TileMap({ lat, lon, approx, video, top }: { lat: number; lon: number; approx: boolean; video: boolean; top?: number }) {
   const mini = useStore((s) => s.mapMini);
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
@@ -105,6 +105,8 @@ export function TileMap({ lat, lon, approx, video }: { lat: number; lon: number;
     <div
       ref={ref}
       className={`tile-map${video ? " on-video" : ""}${mini ? " mini" : ""}`}
+      // Under the channel label and any burned-in readings (camera feeds); videos keep it bottom-right.
+      style={!video && top ? { top } : undefined}
       role="button"
       tabIndex={0}
       title={mini ? t.mapExpand : t.mapFold}

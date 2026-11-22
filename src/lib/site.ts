@@ -12,13 +12,13 @@ export const SITE = {
   nameZh: "香港監察網",
   title: "HK Monitor · 香港監察網 — Hong Kong CCTV monitor for live traffic cameras, weather & news",
   description:
-    "A CCTV monitor for Hong Kong's open data: 1,000+ live traffic cameras, Observatory weather cameras, radar and satellite, live news and Hong Kong YouTube on one video wall — with channel numbers, patrol sequences, cameras near you, a weather and news ticker and an optional colour CRT mode. Free, bilingual, works offline.",
+    "A CCTV monitor for Hong Kong's open data: 1,000+ live traffic cameras with live road speeds and local weather burned in, Observatory weather cameras and radar, Himawari satellite views, congestion, live news and Hong Kong YouTube on one video wall — with channel numbers, patrol sequences, cameras near you, a news ticker and an optional colour CRT mode. Free, bilingual, works offline.",
   descriptionZh:
-    "香港開放數據閉路電視監察網：一千多部運輸署交通攝影機、天文台天氣相機、雷達及衛星圖、新聞直播及香港 YouTube 頻道，全部排成監察牆 — 頻道號碼、自動巡邏、我附近的鏡頭、天氣及新聞跑馬燈，還有彩色 CRT 顯示模式。免費、中英雙語、可離線使用。",
+    "香港開放數據閉路電視監察網：一千多部運輸署交通攝影機（附即時行車速度及當區天氣）、天文台天氣相機及雷達、向日葵衛星圖、擠塞路段、新聞直播及香港 YouTube 頻道，全部排成監察牆 — 頻道號碼、自動巡邏、我附近的鏡頭、新聞跑馬燈，還有彩色 CRT 顯示模式。免費、中英雙語、可離線使用。",
   titleZh: "香港監察網 · HK Monitor — 香港交通閉路電視、天氣及新聞監察牆",
   imageAlt:
-    "HK Monitor CCTV video wall in CRT mode: Hong Kong traffic cameras, weather radar, a speed-map panel, the satellite image and a news ticker",
+    "HK Monitor CCTV video wall in CRT mode: Hong Kong traffic cameras with live road speeds and temperatures, Himawari satellite views, weather radar and a speed-map panel",
   repo: "https://github.com/wiiiimm/hk-monitor",
   keywords:
-    "Hong Kong CCTV, HK traffic cameras, 香港交通攝影機, 運輸署閉路電視, Hong Kong Observatory, 天文台, weather radar, live news Hong Kong, open data, DATA.GOV.HK, CCTV monitor, video wall, CRT",
+    "Hong Kong CCTV, HK traffic cameras, 香港交通攝影機, 運輸署閉路電視, Hong Kong traffic speed, 行車速度, 擠塞, Hong Kong Observatory, 天文台, weather radar, Himawari satellite, 衛星圖, live news Hong Kong, open data, DATA.GOV.HK, CCTV monitor, video wall, CRT",
 } as const;

@@ -304,11 +304,15 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .search:hover { border-color: var(--line-3); }
 .search::placeholder { color: var(--dim); }
 .guide-list { list-style: none; margin: 0; padding: var(--sp-1) 0; overflow-y: auto; flex: 1; }
-.guide-list li { display: flex; align-items: center; border-left: 2px solid transparent; transition: background var(--ease); }
+/* Row: number + status badge top-left, the three actions under them, the text taking the full rest of the width. */
+/* Row: number, status badge and the full-width text; the actions on their own row underneath, right-aligned. */
+.guide-list li { position: relative; display: grid; grid-template-columns: 1fr; border-left: 2px solid transparent; transition: background var(--ease); }
+.guide-list li > .row-actions { display: flex; justify-content: flex-end; align-items: center; gap: 2px; margin-top: -4px; padding: 0 6px 4px 0; }
+.row-actions .fav, .row-actions .fav.grp, .row-actions .fav.yt-link { width: 26px; height: 22px; }
 .guide-list li:hover { background: var(--panel-2); }
 .guide-list li.on-air { border-left-color: var(--rec); background: var(--rec-soft); }
 .guide-list li.on-air:hover { background: rgba(255, 59, 48, 0.11); }
-.guide-row { flex: 1; min-width: 0; display: grid; grid-template-columns: 34px 58px 1fr; gap: var(--sp-2); align-items: center; text-align: left; background: none; border: 0; padding: 7px 4px 7px 10px; }
+.guide-row { flex: 1; min-width: 0; display: grid; grid-template-columns: 34px 54px 1fr; column-gap: var(--sp-2); align-items: center; text-align: left; background: none; border: 0; padding: 7px 8px 5px 10px; }
 .guide-row:focus-visible { outline-offset: -2px; }
 .guide-row .num { color: var(--muted); font: var(--fs-md) var(--mono); font-variant-numeric: tabular-nums; }
 .guide-row .kind { justify-self: stretch; text-align: center; padding-inline: 2px; }
@@ -572,7 +576,12 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 
 /* Autoplaying previews at reduced quality: YouTube picks the stream quality from the player's size (sites can no
    longer request one), so a preview's player is laid out at half size and scaled up — a lighter, lower-res stream. */
-.tile iframe.tile-media.lowq, .crt-video.lowq iframe { width: 50%; height: 50%; transform: scale(2); transform-origin: 0 0; }
+/* As little YouTube chrome as possible: the player is laid out taller than its tile, so the video letterboxes with bars
+   exactly where YouTube draws its title bar (top) and logo / "more videos" strip (bottom) — and those bars sit outside
+   the tile (overflow hidden). --yt-bar is in player pixels. */
+.tile iframe.tile-media, .crt-video iframe { --yt-bar: 60px; position: absolute; inset: auto; left: 0; top: calc(-1 * var(--yt-bar)); width: 100%; height: calc(100% + 2 * var(--yt-bar)); }
+/* Reduced-quality previews: a half-size player scaled ×2 (so the bars are half as many layout pixels). */
+.tile iframe.tile-media.lowq, .crt-video.lowq iframe { --yt-bar: 48px; top: 0; width: 50%; height: calc(50% + 2 * var(--yt-bar)); transform: scale(2) translateY(calc(-1 * var(--yt-bar))); transform-origin: 0 0; }
 
 /* Map inset on the pinned / full-view tile (normal wall, sidebar hidden): like the CRT inset. Click folds it to 80px. */
 .tile-map { position: absolute; z-index: 3; left: 8px; top: 34px; width: clamp(120px, 18%, 260px); aspect-ratio: 3 / 2; overflow: hidden; background: #0b0d10; border: 2px solid rgba(255, 255, 255, 0.8); opacity: 0.8; cursor: pointer; transition: width 0.2s ease, opacity 0.15s; }
@@ -582,3 +591,18 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .tile-map .minimap-pin { width: 10px; height: 10px; margin: -5px 0 0 -5px; }
 .tile-map .minimap-pin::after { inset: -6px; }
 .tile-map-coord { position: absolute; left: 5px; bottom: 3px; font: 11px/1 var(--mono); color: #ffd60a; text-shadow: 1px 1px 0 #000; pointer-events: none; }
+
+/* Burned-in readings under the channel label: road speed, weather, (pinned) nearby congestion. */
+.osd-burn { top: 26px; left: 7px; flex-direction: column; align-items: flex-start; gap: 2px; font-size: clamp(11px, 4cqmin, 13px); }
+.tile.large .osd-burn { top: 30px; font-size: clamp(13px, 1.8cqmin, 16px); gap: 3px; }
+.burn-line { display: flex; gap: 0; max-width: 100%; overflow: hidden; white-space: nowrap; }
+.osd-burn .burn-line span { background: rgba(0, 0, 0, 0.72); padding: 1px 4px; text-shadow: none; }
+.osd-burn .burn-line span + span { padding-left: 2px; }
+.osd-burn .burn-line span + span::before { content: "· "; color: #8a93a0; }
+@media (max-width: 760px) { .tile:not(.large) .osd-burn { display: none; } }
+.panel-burn { display: grid; gap: 4px; margin-top: 8px; font: 12px/1.35 var(--sans); }
+.panel-burn .burn-line { flex-wrap: wrap; white-space: normal; gap: 0 6px; }
+.panel-burn .burn-line span:first-child { font-weight: 600; }
+.nt-tag.jam { background: #b3261e; color: #fff; }
+.nt-item.jam .nt-text { color: #ffcfc9; }
+.guide-list li.empty { display: block; }

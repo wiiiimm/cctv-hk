@@ -2,6 +2,7 @@
 // same icons into the CRT picture with Path2D.
 export const ICON_PATHS = {
   pin: ["M9 3h6l-1 5 3 3v2H7v-2l3-3-1-5z", "M12 13v8"],
+  external: ["M14 4h6v6", "M20 4l-9 9", "M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"],
   unpin: ["M9 3h6l-1 5 3 3v2H7v-2l3-3-1-5z", "M12 13v8", "M3 3l18 18"],
   solo: ["M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"],
   exitSolo: ["M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"],
@@ -43,3 +44,4 @@ export const PinWideIcon = (p: P) => <Icon name="pinWide" {...p} />;
 export const PinSideIcon = (p: P) => <Icon name="pinSide" {...p} />;
 /** Folder with a plus: add to my groups. */
 export const GroupsIcon = (p: P) => <Icon name="groups" {...p} />;
+export const ExternalIcon = (p: P) => <Icon name="external" {...p} />;

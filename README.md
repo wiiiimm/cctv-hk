@@ -6,9 +6,10 @@
 
 **Live:** https://hk-monitor.wiiiimm.codes
 
-**A CCTV monitor for Hong Kong — channel-surf the city like a security control room.** 1,000+ public traffic cameras,
-Observatory weather photos, radar and satellite, live news and Hong Kong YouTube — numbered as channels, tiled on a
-CCTV video wall, patrolled automatically, and optionally shown on a full-colour CRT monitor.
+**A CCTV monitor for Hong Kong — channel-surf the city like a security control room.** 1,000+ public traffic cameras
+with the live road speed and local weather burned into the picture, Observatory weather cameras and radar, Himawari
+satellite views, live news and Hong Kong YouTube — numbered as channels, tiled on a CCTV video wall, patrolled
+automatically, and optionally shown on a full-colour CRT monitor.
 
 ## Why
 
@@ -27,8 +28,13 @@ group — but it's supporting cast, not the whole show.
 - **Channel-surf ~1,900 channels.** Traffic cameras (1001+), HKO weather (2xx), live data (radar, satellite, speed-map
   boards), HK live video (1xx), world live cams (3xx), news & finance (4xx), space (5xx), news recordings (6xx) and Hong
   Kong YouTube shows (3000+). Type a number on the keyboard or the on-screen remote to tune.
+- **Data burned into the feeds**, like a real control-room monitor: under each camera's label, the live speed on the
+  road it watches (from TD's road-network speeds — green moving, amber slow, red congested) and the temperature and
+  rain where it is. The pinned view adds the nearest station and any congestion nearby; the sidebar lists the same
+  under the map.
 - **Near me.** Pick "Near me" and allow location: the wall fills with the 60 cameras and feeds closest to you, nearest
-  first with distances, and the ticker leads with the weather at your nearest Observatory station. Your location stays
+  first with distances, and the ticker leads with the weather at your nearest Observatory station and the congestion
+  around you (repeated often). Your location stays
   on your device — it isn't saved, sent or put in shared links.
 - **A video wall that fills any screen.** Pick a preview size; the wall shows as many as fit, up to 16 previews. Pin a
   feed to make it big (beside or above the previews, or full screen) — on desktop, tablet or phone. The pinned feed
@@ -45,8 +51,9 @@ group — but it's supporting cast, not the whole show.
 - **Live and replay.** YouTube channels that broadcast in bulletins (Cable News, RTHK, HK01) or stream occasionally
   are *followed*: live when they're on air, recent recordings otherwise — and recent recordings get their own channels.
 - **A news ticker** with Observatory warnings, the current weather, forecast and outlook (with weather icons),
-  temperatures around Hong Kong and where it's raining, TD special traffic news and RTHK headlines — mixed into a new
-  order on every visit, and part of the picture in CRT mode.
+  temperatures around Hong Kong and where it's raining, the worst congested roads right now ("Waterloo Road 5 km/h ·
+  1.2 km"), TD special traffic news and RTHK headlines — mixed into a new order on every visit, and part of the picture
+  in CRT mode.
 - **Autoplay on or off** — on, every video preview plays (started one by one, at a lighter quality); off, previews
   show a still until you pick one. Sound follows the pinned (or selected) video.
 - **Share the exact view** — every setting is in the URL (group, wall, pin, CRT look, language…).
@@ -60,7 +67,8 @@ group — but it's supporting cast, not the whole show.
 All open, keyless sources:
 
 - **Transport Department** via [DATA.GOV.HK](https://data.gov.hk): traffic snapshot images (1,013 cameras, ~2 min),
-  speed-map panels, special traffic news.
+  traffic speeds of road-network segments (matched to street names and lengths with the Road Network (2nd Generation)
+  dataset — `npm run data:roads`), speed-map panels, special traffic news.
 - **Hong Kong Observatory**: weather photos, radar (64 / 128 / 256 km), satellite imagery, weather warnings, current
   weather, local forecast and outlook, station temperatures and district rainfall.
 - **Japan Meteorological Agency** Himawari-9 true-colour imagery, and **NASA GIBS** Himawari-9 infrared and air-mass
@@ -99,6 +107,7 @@ npm run dev        # dev server
 npm run check      # type check
 npm run build      # production build
 npm run data:td    # refresh the Transport Department camera list
+npm run data:roads # rebuild the road-segment names (needs: pip install pyogrio pyproj shapely)
 ```
 
 Architecture notes for contributors are in [AGENTS.md](AGENTS.md).
@@ -109,8 +118,9 @@ Architecture notes for contributors are in [AGENTS.md](AGENTS.md).
 
 [English](#hk-monitor--香港監察網) · **繁體中文**
 
-**香港的閉路電視監察網 — 像保安控制室一樣轉台看香港。** 一千多部運輸署交通攝影機、天文台天氣相機、雷達及衛星圖、新聞直播及香港
-YouTube 頻道，全部編上頻道號碼，排成閉路電視監察牆，自動巡邏，還可以用全彩 CRT 顯示器模式觀看。
+**香港的閉路電視監察網 — 像保安控制室一樣轉台看香港。** 一千多部運輸署交通攝影機（畫面上直接顯示即時行車速度及當區天氣）、
+天文台天氣相機及雷達、向日葵衛星圖、新聞直播及香港 YouTube 頻道，全部編上頻道號碼，排成閉路電視監察牆，自動巡邏，還可以用全彩
+CRT 顯示器模式觀看。
 
 網址：https://hk-monitor.wiiiimm.codes
 
@@ -127,8 +137,10 @@ YouTube 頻道，全部編上頻道號碼，排成閉路電視監察牆，自動
 
 - **約 1,900 個頻道隨意轉台。** 交通攝影機（1001+）、天文台天氣（2xx）、實時數據（雷達、衛星圖、行車速度圖）、香港直播（1xx）、
   世界直播（3xx）、新聞及財經（4xx）、太空（5xx）、新聞重溫（6xx）及香港 YouTube 節目（3000+）。用鍵盤或畫面上的遙控器輸入號碼即可轉台。
+- **數據直接疊在畫面上**，像真正的控制室監視器：每部鏡頭標籤下顯示所拍道路的即時行車速度（運輸署道路網絡速度 — 綠色暢順、
+  琥珀色緩慢、紅色擠塞）及當地氣溫和雨量。釘選畫面另加最近的氣象站及附近擠塞路段；側欄地圖下亦會列出。
 - **我附近。** 選擇「我附近」並允許位置權限：牆上會顯示離你最近的 60 個鏡頭及來源（由近至遠，附距離），跑馬燈亦會先顯示最近天文台
-  站的天氣。你的位置只留在你的裝置上 — 不會儲存、不會傳送，也不會放進分享連結。
+  站的天氣及你附近的擠塞路段（並經常重複）。你的位置只留在你的裝置上 — 不會儲存、不會傳送，也不會放進分享連結。
 - **填滿任何螢幕的監察牆。** 自選預覽大小，能放多少就放多少（最多 16 個預覽）。釘選一個畫面放大（在預覽旁、上方或全螢幕）—
   電腦、平板、手機皆可。釘選畫面附小地圖（點擊可收起）。
 - **香港及亞洲衛星圖**：向日葵 9 號 — 日本氣象廳真彩色圖，以及 NASA 紅外線及氣團圖，與天文台雷達一起放在「實時數據」及「香港天氣」組別。
@@ -139,8 +151,8 @@ YouTube 頻道，全部編上頻道號碼，排成閉路電視監察牆，自動
   罪案及懸疑、電影），以及你自己的組別和最愛。每個組別都有地圖檢視；中英文模糊搜尋。
 - **直播及重溫。** 以新聞時段形式播出（有線新聞、香港電台、香港01）或間中直播的 YouTube 頻道會被「追蹤」：直播時看直播，否則播放最近
   的錄影 — 最近的錄影亦有自己的頻道。
-- **新聞跑馬燈**：天文台警告、現時天氣、預測及展望（附天氣圖示）、各區氣溫及下雨地區、運輸署特別交通消息及香港電台新聞 — 每次開啟
-  次序都不同，在 CRT 模式下更是畫面的一部分。
+- **新聞跑馬燈**：天文台警告、現時天氣、預測及展望（附天氣圖示）、各區氣溫及下雨地區、即時最擠塞路段（「窩打老道 5 km/h ·
+  1.2 公里」）、運輸署特別交通消息及香港電台新聞 — 每次開啟次序都不同，在 CRT 模式下更是畫面的一部分。
 - **自動播放開關** — 開啟時所有影片預覽都會播放（逐個啟動、較輕的畫質）；關閉時預覽只顯示靜止畫面，直至你選擇。聲音跟隨釘選（或選取）的影片。
 - **分享完全相同的畫面** — 所有設定都在網址中（組別、牆、釘選、CRT 外觀、語言…）。
 - **繁體中文 / English**，空間足夠時同時顯示另一種語言。
@@ -151,7 +163,8 @@ YouTube 頻道，全部編上頻道號碼，排成閉路電視監察牆，自動
 
 全部是公開、毋須金鑰的來源：
 
-- **運輸署**（經 [資料一線通 DATA.GOV.HK](https://data.gov.hk)）：交通攝影機快照（1,013 部，約每 2 分鐘）、行車速度圖、特別交通消息。
+- **運輸署**（經 [資料一線通 DATA.GOV.HK](https://data.gov.hk)）：交通攝影機快照（1,013 部，約每 2 分鐘）、道路網絡路段行車速度（以
+  「道路網絡（第二代）」配對街道名稱及長度 — `npm run data:roads`）、行車速度圖、特別交通消息。
 - **香港天文台**：天氣相機、雷達（64 / 128 / 256 公里）、衛星圖、天氣警告、現時天氣、本港天氣預測及展望、各站氣溫及分區雨量。
 - **日本氣象廳** 向日葵 9 號真彩色衛星圖，及 **NASA GIBS** 向日葵 9 號紅外線及氣團圖。
 - **香港電台** 新聞（RSS）。
@@ -187,6 +200,7 @@ npm run dev        # 開發伺服器
 npm run check      # 型別檢查
 npm run build      # 正式建置
 npm run data:td    # 更新運輸署攝影機清單
+npm run data:roads # 重建道路路段名稱（需要：pip install pyogrio pyproj shapely）
 ```
 
 給貢獻者的架構說明見 [AGENTS.md](AGENTS.md)。

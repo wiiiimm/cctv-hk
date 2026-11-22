@@ -1,4 +1,7 @@
 import { CHANNEL_BY_KEY, fmtNum } from "../../lib/channels";
+import { BurnLines } from "../BurnIn";
+import { burnIn } from "../../lib/burnin";
+import { useNews } from "../../lib/news";
 import { useSnap } from "../../lib/snapshots";
 import { actions, activeKey, useStore } from "../../lib/store";
 import { chAltName, chDistrict, chName, chRegion, useT } from "../../lib/i18n";
@@ -16,9 +19,11 @@ export function FocusPanel({ compact = false }: { compact?: boolean }) {
   const fav = useStore((s) => s.favourites.includes(key));
   const showMap = useStore((s) => s.showMap);
   const lang = useStore((s) => s.lang);
+  useNews(lang);
   const t = useT();
   const other = lang === "zh" ? "en" : "zh";
   const ch = CHANNEL_BY_KEY.get(key);
+  const burn = ch ? burnIn(ch, lang, true) : [];
   const snap = useSnap(ch);
   const now = useClock();
   if (!ch) return null;
@@ -97,6 +102,8 @@ export function FocusPanel({ compact = false }: { compact?: boolean }) {
       ) : (
         <p className="panel-nogeo">{t.noGeo}</p>
       )}
+      {/* Live road speed / weather / nearby congestion for this camera (same readings as burned into the feed). */}
+      <BurnLines lines={burn} className="panel-burn" />
     </section>
   );
 }

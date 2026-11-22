@@ -36,8 +36,9 @@ export function NewsTicker({ crt = false, style }: { crt?: boolean; style?: Reac
           {it.kind === "warn" && <b className="nt-tag warn">{t.newsWarn}</b>}
           {it.kind === "traffic" && <b className="nt-tag traffic">{t.newsTraffic}</b>}
           {it.kind === "weather" && <b className="nt-tag weather">{t.newsWeather}</b>}
+          {it.kind === "jam" && <b className="nt-tag jam">{t.newsJam}</b>}
           {it.icon !== undefined && <span className="nt-icon" aria-hidden dangerouslySetInnerHTML={{ __html: wxIconSvg(it.icon) }} />}
-          {it.kind !== "traffic" && it.time && <span className="nt-time">{hhmm(it.time)}</span>}
+          {it.kind !== "traffic" && it.kind !== "jam" && it.time && <span className="nt-time">{hhmm(it.time)}</span>}
           <span className="nt-text">{it.text}</span>
         </>
       );

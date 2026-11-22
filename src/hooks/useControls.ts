@@ -127,23 +127,13 @@ export function useControls() {
     };
   }, []);
 
-  // Sequence (patrol): one tick per dwell period — for "rolling", one preview per (dwell / previews) so each slot
-  // is refreshed once per dwell. Re-armed when toggled, when the mode / dwell / wall size changes, and after any
-  // manual change, so a manual change always gets a full dwell before the sequence moves on.
+  // Sequence (patrol): one tick per dwell period (the 5s / 10s / 15s … control) in every mode — "rolling" swaps one
+  // preview per tick, "page" flips a page, "pinned" queues the next channel. Re-armed when toggled, when the mode /
+  // dwell / wall size changes, and after any manual change, so a manual change always gets a full dwell before the
+  // sequence moves on.
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
-    // Rolling never swaps more often than every 800ms; when (dwell / previews) is shorter, each tick swaps several
-    // previews instead, so every preview still changes exactly once per dwell.
-    const MIN_TICK = 800;
-    const plan = () => {
-      const s = store.get();
-      const ms = s.patrolSec * 1000;
-      if (s.patrolMode !== "rolling") return { every: ms, swaps: 1 };
-      const previews = Math.max(1, s.cells.length - (s.pinned ? 1 : 0));
-      const per = ms / previews;
-      const swaps = Math.max(1, Math.ceil(MIN_TICK / per));
-      return { every: per * swaps, swaps };
-    };
+    const plan = () => ({ every: store.get().patrolSec * 1000, swaps: 1 });
     const arm = () => {
       clearInterval(timer);
       if (!store.get().patrol) return;

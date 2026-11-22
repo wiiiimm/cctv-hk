@@ -1,5 +1,6 @@
 // Draws the security-monitor picture (wall or single feed, plus OSD) into a flat 2D canvas.
 // The CRT renderer then uploads that canvas as a texture.
+import { burnIn, type BurnLine } from "../burnin";
 import { wxIconImage } from "../wxIcons";
 import { CHANNEL_BY_KEY, fmtNum } from "../channels";
 import { DICTS, chAltName, chName } from "../i18n";
@@ -107,6 +108,25 @@ function caption(ctx: CanvasRenderingContext2D, s: string, x: number, y: number,
   ctx.fillText(s, x, y);
 }
 
+/** One burned-in line: coloured parts on black blocks, joined by "·", clipped to `maxW`. */
+function burnLine(ctx: CanvasRenderingContext2D, parts: BurnLine, x: number, y: number, size: number, maxW: number) {
+  ctx.font = `${size}px ${OSD}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  const px = size * 0.3;
+  let cx = x;
+  parts.forEach((p, i) => {
+    const s = i ? `· ${p.text}` : p.text;
+    const w = ctx.measureText(s).width;
+    if (cx + w > x + maxW) return;
+    ctx.fillStyle = "rgba(0,0,0,0.78)";
+    ctx.fillRect(cx - px, y - size * 0.12, w + px * 2, size * 1.15);
+    ctx.fillStyle = p.color;
+    ctx.fillText(s, cx, y);
+    cx += w + px * 2;
+  });
+}
+
 /** Phones: preview badges become a dot (the pinned / full tile keeps its label), matching the DOM wall. */
 const phoneMq = typeof window !== "undefined" ? window.matchMedia("(max-width: 760px)") : null;
 
@@ -191,6 +211,11 @@ function drawCell(ctx: CanvasRenderingContext2D, key: string, x: number, y: numb
     ctx.fillText(label, x + pad, y + pad * 0.6);
     caption(ctx, t.kind[ch.kind].toUpperCase(), x + pad + tw + fs * 0.7, y + pad * 0.6, fs);
   } else caption(ctx, `CH${fmtNum(ch.num)} ${t.kind[ch.kind].toUpperCase()}`, x + pad, y + pad * 0.6, fs);
+  // Burned-in readings under the label (road speed, weather; the pinned view adds detail). Not on tiny phone previews.
+  if (big || !phoneMq?.matches) {
+    const bfs = big ? fs : fs * 0.9;
+    burnIn(ch, lang, big).forEach((line, i) => burnLine(ctx, line, x + pad, y + pad * 0.6 + fs * 1.3 + i * bfs * 1.3, bfs, w - pad * 2));
+  }
   if (ch.kind === "yt") {
     if (snap.live) badge(ctx, snap.replay ? t.replay : t.live, x + w - pad, y + pad * 0.6, fs, snap.replay ? "#c27c00" : "#d71f1f", !!phoneMq?.matches && !big);
   } else {
@@ -315,7 +340,9 @@ const path2d = (d: string) => {
 
 function drawPinUi(ctx: CanvasRenderingContext2D, r: CellRect, ui: NonNullable<ScreenView["pinUi"]>, k: number) {
   if (ui.opacity <= 0) return;
-  const gaps: number[] = ui.buttons.map((_, i) => (i === 0 ? 0 : i === 1 ? 4 : 2));
+  // Same spacing as the DOM: 4px between groups ([open video] · pin toggle · sizes), 2px inside the sizes group.
+  const ext = ui.buttons[0]?.icon === "external" ? 1 : 0;
+  const gaps: number[] = ui.buttons.map((_, i) => (i === 0 ? 0 : i <= 1 + ext ? 4 : 2));
   const total = ui.buttons.length * BTN_W + gaps.reduce((a, b) => a + b, 0);
   let x = r.x + r.w - (8 + total) * k;
   const y = r.y + r.h - (34 + BTN_H) * k;
@@ -381,15 +408,15 @@ function drawTicker(ctx: CanvasRenderingContext2D, items: NewsItem[], lang: Lang
   if (!tickerCache || tickerCache.items !== items || tickerCache.lang !== lang || tickerCache.fs !== fs) {
     const gap = fs * 2.2;
     const runs = items.map((it) => {
-      const tag = it.kind === "warn" ? d.newsWarn : it.kind === "traffic" ? d.newsTraffic : it.kind === "weather" ? d.newsWeather : undefined;
+      const tag = it.kind === "warn" ? d.newsWarn : it.kind === "traffic" ? d.newsTraffic : it.kind === "weather" ? d.newsWeather : it.kind === "jam" ? d.newsJam : undefined;
       const iconW = it.icon !== undefined ? fs * 1.25 : 0;
-      const time = it.kind !== "traffic" && it.time ? new Date(it.time).toLocaleTimeString("en-GB", { timeZone: "Asia/Hong_Kong", hour: "2-digit", minute: "2-digit" }) + "  " : "";
+      const time = it.kind !== "traffic" && it.kind !== "jam" && it.time ? new Date(it.time).toLocaleTimeString("en-GB", { timeZone: "Asia/Hong_Kong", hour: "2-digit", minute: "2-digit" }) + "  " : "";
       const text = time + it.text;
       const tagW = tag ? ctx.measureText(tag).width + fs * 0.7 : 0;
       const textW = ctx.measureText(text).width;
-      const tagBg = it.kind === "warn" ? "#d71f1f" : it.kind === "weather" ? "#1f6fb8" : "#c27c00";
+      const tagBg = it.kind === "warn" ? "#d71f1f" : it.kind === "weather" ? "#1f6fb8" : it.kind === "jam" ? "#b3261e" : "#c27c00";
       const tagFg = it.kind === "traffic" ? "#000" : "#fff";
-      const color = it.kind === "warn" ? "#ff8a80" : it.kind === "weather" ? "#bfe1ff" : "#f2f2f2";
+      const color = it.kind === "warn" ? "#ff8a80" : it.kind === "weather" ? "#bfe1ff" : it.kind === "jam" ? "#ffcfc9" : "#f2f2f2";
       return { tag, tagBg, tagFg, icon: it.icon, text, color, tagW, textW, w: (tag ? tagW + fs * 0.5 : 0) + (iconW ? iconW + fs * 0.35 : 0) + textW + gap };
     });
     tickerCache = { items, lang, fs, runs, total: runs.reduce((a, r) => a + r.w, 0) };
@@ -543,7 +570,9 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
     // the row's top is 34 + BTN_H above the cell's bottom), so it never covers them.
     const k = v.scale;
     const mx0 = onVideo ? cellX + cellW - mw - 8 * k : cellX + fsCap * 0.45;
-    const my0 = onVideo ? cellY + cellH - mh - (34 + BTN_H + 6) * k : cellY + fsCap * 2.2;
+    // Camera feeds: below the label and its burned-in lines.
+    const burnRows = onVideo ? 0 : burnIn(pinnedCh, v.lang, true).length;
+    const my0 = onVideo ? cellY + cellH - mh - (34 + BTN_H + 6) * k : cellY + fsCap * 2.2 + burnRows * fsCap * 1.3;
     drawMap(mc, pinnedCh.geo.lat, pinnedCh.geo.lon, pinnedCh.geo.approx, mx0, my0, mw, mh, now, !v.mapMini);
     mc.restore();
     mapHit = { x: mx0 / v.scale, y: my0 / v.scale, w: mw / v.scale, h: mh / v.scale };

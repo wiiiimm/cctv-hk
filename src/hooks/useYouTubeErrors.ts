@@ -17,7 +17,7 @@ const NOT_STARTED = new Set([-1, 2, 5]);
  *   browser pauses it for unmuting without a user gesture, it goes back to muted playback and sound is retried on
  *   the next click / key press. Sound on / off is a message, not a new URL, so it never reloads the player.
  */
-export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, channelKey: string, enabled = true, sound = false) {
+export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, channelKey: string, enabled = true, sound = false, live = false) {
   const soundRef = useRef(sound);
   const send = useRef<(func: string, args?: unknown[]) => void>(() => {});
 
@@ -35,6 +35,9 @@ export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, chann
 
     let state: number | undefined;
     let nudges = 0;
+    // A live stream with a DVR window can open at the start of the window instead of now: jump to the live edge once,
+    // when it first plays (seeking past the end lands on the live head).
+    let atEdge = !live;
     let unmutedAt = 0;
     let soundBlocked = false;
     const applySound = () => {
@@ -92,7 +95,13 @@ export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, chann
         command("mute");
         command("playVideo");
       }
-      if (next === PLAYING) nudges = 0;
+      if (next === PLAYING) {
+        nudges = 0;
+        if (!atEdge) {
+          atEdge = true;
+          command("seekTo", [1e9, true]);
+        }
+      }
       state = next;
       if (NOT_STARTED.has(next) && nudges === 0) {
         nudges = 1;
@@ -105,6 +114,7 @@ export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, chann
       ready = false;
       state = undefined;
       nudges = 0;
+      atEdge = !live;
       hello();
     };
     frame.addEventListener("load", reload);
@@ -117,7 +127,7 @@ export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, chann
       frame.removeEventListener("load", reload);
       send.current = () => {};
     };
-  }, [ref, channelKey, enabled]);
+  }, [ref, channelKey, enabled, live]);
 
   // Sound on / off (pin, unpin, mute toggle) without reloading the player.
   useEffect(() => {

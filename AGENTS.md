@@ -132,6 +132,21 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   items, 4 random other stations per refresh, raining districts, everything else shuffled by a per-page-load seed.
 - `src/pages/api/snap.ts` — same-origin relay for HKO photos, radar and satellite (no CORS upstream). Allow-listed codes only.
 
+## Road speeds and burned-in readings
+
+- `/api/news` also reads TD's road-network segment speeds (`irnAvgSpeed-all.xml`, CORS open) and joins them with
+  `src/data/road-segments.json` (segment id → [English, Chinese, length m, lat, lon]; built by `npm run data:roads` =
+  `scripts/build-road-segments.py` from "Road Network (2nd Generation)" CENTERLINE: ROUTE_ID = segment id; "-99" names
+  fall back to alias / route number). Output: `jams` (congested stretches < 20 km/h, same road within ~2 km merged,
+  worst first) and `camRoads` (each TD camera's segment: the road it's named after within 400 m, else the nearest within
+  180 m → [en, zh, km/h]).
+- Ticker (`lib/news.ts`): the worst 5 jams citywide (kind "jam"); with the Near me group, jams within 3 km lead and
+  repeat every 3 items with the local weather.
+- `lib/burnin.ts` decides what is burned into a feed under its channel label (DOM `.osd-burn`, CRT `burnLine`, sidebar
+  `.panel-burn`): road speed (TD cameras) + temperature / rain of the nearest station / district (any HK feed); the
+  pinned view adds the station name and congestion within 1.5 km. Readings come from the same poll as the ticker
+  (`roadWeather()`), kept alive by Tiles / CrtScreen even with NEWS off.
+
 ## Offline / PWA
 
 - `public/sw.js` (production builds only — `<meta name="service-worker">` is "on" when PROD; modelled on midi-mixer):

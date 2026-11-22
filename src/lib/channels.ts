@@ -483,7 +483,10 @@ export function youtubeEmbed(id: string, muted: boolean, playlist?: string[]): s
     controls: "0",
     modestbranding: "1",
     rel: "0",
-    iv_load_policy: "3",
+    iv_load_policy: "3", // no annotations / cards
+    disablekb: "1", // no player keyboard shortcuts (the wall has its own)
+    fs: "0", // no fullscreen button
+    cc_load_policy: "0",
     // Lets the page hear the player's error events (see useYouTubeErrors).
     enablejsapi: "1",
     origin: typeof location !== "undefined" ? location.origin : "",

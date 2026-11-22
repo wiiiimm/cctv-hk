@@ -1,5 +1,7 @@
 import type { APIRoute } from "astro";
 import { iconForText } from "../../lib/wxIcons";
+import ROADS from "../../data/road-segments.json";
+import TD_CAMERAS from "../../data/td-cameras.json";
 
 export const prerender = false;
 
@@ -10,10 +12,11 @@ export const prerender = false;
 // - HKO weather warnings in force (JSON)            → kind "warn"
 // - HKO current weather + local forecast (JSON)     → kind "weather" (with an HKO icon code)
 // - TD special traffic news (XML, not RSS)          → kind "traffic"
+// - TD road-segment speeds (irnAvgSpeed XML)         → `jams`: congested stretches (the device picks which to show)
 // - RTHK local news (RSS)                           → kind "news"
 
 export interface NewsItem {
-  kind: "warn" | "weather" | "traffic" | "news";
+  kind: "warn" | "weather" | "traffic" | "jam" | "news";
   /** HKO weather icon code (kind "weather"); see lib/wxIcons. */
   icon?: number;
   text: string;
@@ -114,6 +117,92 @@ export interface WeatherPlaces {
 
 const places: Record<"en" | "zh", WeatherPlaces | undefined> = { en: undefined, zh: undefined };
 
+/** A congested stretch: one road in one area (segments of the same road within ~2 km), slowest first. */
+export interface Jam {
+  en: string;
+  zh: string;
+  /** Length-weighted average speed of the congested segments (km/h). */
+  kmh: number;
+  /** Their total length (km). */
+  km: number;
+  lat: number;
+  lon: number;
+}
+
+const IRN = "https://resource.data.one.gov.hk/td/traffic-detectors/irnAvgSpeed-all.xml";
+/** Below this a segment counts as congested (TD's speed map shows red below about 20 km/h on most roads). */
+const JAM_KMH = 20;
+const roads = ROADS as unknown as Record<string, [string, string, number, number, number]>;
+
+/** Road speed at a traffic camera: the nearest speed segment within CAM_ROAD_M of it. */
+export type CamRoad = [en: string, zh: string, kmh: number];
+const CAM_ROAD_M = 180;
+let camSegCache: Map<string, string> | null = null;
+/** Each TD camera's speed segment, worked out once per server instance: the nearest segment of the road the camera is
+ * named after (within NAMED_ROAD_M), else the nearest segment of any road (within CAM_ROAD_M). By segment midpoint. */
+const NAMED_ROAD_M = 400;
+function camSegments(): Map<string, string> {
+  if (camSegCache) return camSegCache;
+  const m = new Map<string, string>();
+  const segs = Object.entries(roads);
+  for (const c of TD_CAMERAS as { id: string; name: string; lat: number; lon: number }[]) {
+    const camName = c.name.toLowerCase();
+    let named = "";
+    let namedD = NAMED_ROAD_M;
+    let any = "";
+    let anyD = CAM_ROAD_M;
+    const kx = 111_320 * Math.cos((c.lat * Math.PI) / 180);
+    for (const [id, r] of segs) {
+      const dy = (r[3] - c.lat) * 110_540;
+      if (Math.abs(dy) > NAMED_ROAD_M) continue;
+      const d = Math.hypot(dy, (r[4] - c.lon) * kx);
+      if (d < namedD && camName.includes(r[0].toLowerCase())) {
+        namedD = d;
+        named = id;
+      }
+      if (d < anyD) {
+        anyD = d;
+        any = id;
+      }
+    }
+    if (named || any) m.set(c.id, named || any);
+  }
+  return (camSegCache = m);
+}
+
+async function congestion(): Promise<{ jams: Jam[]; cams: Record<string, CamRoad> }> {
+  const xml = await get(IRN);
+  const speedOf = new Map<string, number>();
+  const groups = new Map<string, { en: string; zh: string; len: number; speedLen: number; lat: number; lon: number }>();
+  for (const [, id, speed, valid] of xml.matchAll(/<segment_id>(\d+)<\/segment_id><speed>([\d.]+)<\/speed><valid>(\w)<\/valid>/g)) {
+    const v = Number(speed);
+    if (valid === "Y") speedOf.set(id, v);
+    const r = roads[id];
+    if (valid !== "Y" || !r || !(v < JAM_KMH)) continue;
+    const [en, zh, len, lat, lon] = r;
+    // Same road, same ~2 km cell: one stretch (a long road jammed in two places reads as two items).
+    const key = `${en}|${Math.round(lat / 0.02)}|${Math.round(lon / 0.02)}`;
+    const g = groups.get(key) ?? { en, zh, len: 0, speedLen: 0, lat: 0, lon: 0 };
+    g.len += len;
+    g.speedLen += v * len;
+    g.lat += lat * len;
+    g.lon += lon * len;
+    groups.set(key, g);
+  }
+  const cams: Record<string, CamRoad> = {};
+  for (const [cam, seg] of camSegments()) {
+    const v = speedOf.get(seg);
+    if (v !== undefined) cams[cam] = [roads[seg][0], roads[seg][1], Math.round(v)];
+  }
+  const jams = [...groups.values()]
+    .filter((g) => g.len >= 250)
+    .map((g) => ({ en: g.en, zh: g.zh, kmh: Math.round(g.speedLen / g.len), km: Math.round(g.len / 100) / 10, lat: +(g.lat / g.len).toFixed(5), lon: +(g.lon / g.len).toFixed(5) }))
+    // Worst first: long and slow.
+    .sort((a, b) => b.km * (JAM_KMH + 2 - b.kmh) - a.km * (JAM_KMH + 2 - a.kmh))
+    .slice(0, 40);
+  return { jams, cams };
+}
+
 interface Rhrread {
   icon?: number[];
   updateTime?: string;
@@ -187,10 +276,10 @@ export const GET: APIRoute = async ({ url }) => {
   const hit = cache.get(lang);
   if (hit && Date.now() - hit.at < 60_000) return json(hit.body);
   // Each source fails on its own: one publisher being down doesn't blank the ticker.
-  const parts = await Promise.allSettled([warnings(lang), weather(lang), traffic(lang), news(lang)]);
+  const [roadsNow, ...parts] = await Promise.allSettled([congestion(), warnings(lang), weather(lang), traffic(lang), news(lang)]);
   const items = parts.flatMap((p) => (p.status === "fulfilled" ? p.value : []));
   const failed = parts.filter((p) => p.status === "rejected").length;
-  const body = JSON.stringify({ items, places: places[lang] ?? null, failed, at: new Date().toISOString() });
+  const body = JSON.stringify({ items, places: places[lang] ?? null, jams: roadsNow.status === "fulfilled" ? roadsNow.value.jams : [], camRoads: roadsNow.status === "fulfilled" ? roadsNow.value.cams : {}, failed, at: new Date().toISOString() });
   if (failed < parts.length) cache.set(lang, { at: Date.now(), body });
   return json(body);
 };

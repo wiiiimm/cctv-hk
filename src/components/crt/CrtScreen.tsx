@@ -14,7 +14,7 @@ import { crtCurvature, crtInset, presetById, setCrtCurve, videoFilter, type CrtP
 import "./crt-video.css";
 import { chName } from "../../lib/i18n";
 import { powerThunk, staticBurst } from "../../lib/audio";
-import { PinControls } from "../monitor/PinControls";
+import { PinControls, pinnedVideoUrl } from "../monitor/PinControls";
 import { useYouTubeErrors } from "../../hooks/useYouTubeErrors";
 
 /** How long the live layers stay hidden: through the power-on sequence, and through a whole-wall static burst. */
@@ -49,7 +49,7 @@ function CrtYouTube({ chKey, rect, muted, big, preview, preset, switchedAt, veil
   const frameRef = useRef<HTMLIFrameElement>(null);
   // Previews take turns to start and play at reduced quality (see usePlayerSlot / .lowq).
   const play = usePlayerSlot(!!ch && ch.kind === "yt" && !!snap.live, preview, `${chKey}|${snap.videoId ?? ""}`);
-  useYouTubeErrors(frameRef, chKey, play, !muted);
+  useYouTubeErrors(frameRef, chKey, play, !muted, !!snap.live && !snap.replay);
   const [burst, setBurst] = useState(false);
   useEffect(() => {
     if (!switchedAt || Date.now() - switchedAt > 400) return;
@@ -102,12 +102,14 @@ function videoCells(s: { cells: string[]; pinned: boolean; focused: boolean; sel
 }
 
 /** Which pin buttons to draw into the CRT picture, mirroring PinControls (pin toggle, then the three sizes). */
-function pinButtons(s: { pinned: boolean; focused: boolean; selected: number; pinMode: string }, hover: boolean) {
+function pinButtons(s: { pinned: boolean; focused: boolean; selected: number; pinMode: string; cells: string[] }, hover: boolean) {
   const onPinned = s.focused || (s.pinned && s.selected <= 0);
   if (!onPinned) return { cell: s.selected, buttons: [{ icon: "pin" as const, on: false }], opacity: hover ? 1 : 0.7 };
+  const cell = s.focused ? s.selected : 0;
   return {
-    cell: s.focused ? s.selected : 0,
+    cell,
     buttons: [
+      ...(pinnedVideoUrl(s.cells[cell]) ? [{ icon: "external" as const, on: false }] : []),
       { icon: "unpin" as const, on: true },
       { icon: "pinWide" as const, on: !s.focused && s.pinMode === "wide" },
       { icon: "pinSide" as const, on: !s.focused && s.pinMode === "side" },
@@ -356,7 +358,8 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   const curveOn = useStore((s) => s.crtCurve);
   setCrtCurve(curveOn);
   const tubeInset = crtInset(crtCurvature(presetById(preset)));
-  const news = useNews(newsOn ? lang : null);
+  // Always listen (the burned-in road / weather readings come from the same poll); the ticker only when NEWS is on.
+  const news = useNews(lang);
   newsRef.current = newsOn ? (news ?? []) : null;
   const aspect = useStore(wallAspect);
   const pinAspect = useStore(bigAspect);

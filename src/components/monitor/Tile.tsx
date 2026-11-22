@@ -1,4 +1,7 @@
 import { memo, useRef } from "react";
+import { BurnLines } from "../BurnIn";
+import { burnIn } from "../../lib/burnin";
+import { useNews } from "../../lib/news";
 import { TileMap } from "../MiniMap";
 import { usePlayerSlot } from "../../hooks/usePlayerSlot";
 import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed } from "../../lib/channels";
@@ -31,12 +34,14 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
   const t = useT();
   const lang = useStore((s) => s.lang);
   const showMap = useStore((s) => s.showMap);
+  useNews(lang); // keeps the road / weather readings fresh (shared poller)
+  const burn = ch ? burnIn(ch, lang, large) : [];
   const frameRef = useRef<HTMLIFrameElement>(null);
   // Previews (not the pinned / full-view or selected video) start one after another and play at reduced quality.
   const preview = !large && !selected;
   const willPlay = usePlayerSlot(ch?.kind === "yt" && !ch.noEmbed && allowVideo && !!snap.live, preview, `${channelKey}|${snap.videoId ?? ""}`);
   // Players load muted (autoplay is allowed); the hook starts playback and unmutes the one that should have sound.
-  useYouTubeErrors(frameRef, channelKey, willPlay, !muted);
+  useYouTubeErrors(frameRef, channelKey, willPlay, !muted, !!snap.live && !snap.replay);
   if (!ch) return <div className="tile" />;
 
   const isVideo = ch.kind === "yt";
@@ -108,6 +113,7 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
           <div className="osd osd-tl">
             <b>CH {fmtNum(ch.num)}</b> <span className={`kind kind-${ch.kind}`}>{t.kind[ch.kind]}</span>
           </div>
+          <BurnLines lines={burn} className="osd osd-burn" />
           <div className="osd osd-tr">
             {isVideo ? (
               snap.live ? <span className={`badge${snap.replay ? " replay" : ""}`}>{snap.replay ? t.replay : t.live}</span> : null
@@ -147,7 +153,7 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
           {t.watchOnYouTube}
         </a>
       )}
-      {large && mapOnTile && showMap && ch.geo && <TileMap lat={ch.geo.lat} lon={ch.geo.lon} approx={ch.geo.approx} video={isVideo} />}
+      {large && mapOnTile && showMap && ch.geo && <TileMap lat={ch.geo.lat} lon={ch.geo.lon} approx={ch.geo.approx} video={isVideo} top={34 + burn.length * 22} />}
       {pinRole && <PinControls role={pinRole} index={index} />}
       {/* Selection indicator: drawn above the picture (an outline on the tile itself sits underneath it). */}
       {selected && (
