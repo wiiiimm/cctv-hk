@@ -451,16 +451,21 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
     } else drawCell(ctx, v.cells[ci], r.x, r.y, r.w, r.h, now, big, live, v.lang, v.scale, highlight, osdFor(ci));
     if (highlight) drawSelection(osdFor(ci), r, v.scale);
   });
-  // Previews paged under a pinned video (switchedCell -2): a static burst on each preview only (canvas noise, so it
-  // still goes through the CRT look), the pinned video untouched.
-  // Dev aid: window.__crtPageSw = true holds this previews-only static on (for inspection).
+  // Channel-change static drawn on the canvas (not by the shader):
+  // - previews paged under a pinned video (switchedCell -2): every preview, the pinned video untouched;
+  // - flat (YouTube) tiles, which sit above the shader on the overlay so its static can't show through them: the
+  //   retuned tile, or all of them on a whole-wall change (-1).
+  // Dev aid: window.__crtPageSw = true holds the -2 burst on (for inspection).
   const holdPage = import.meta.env.DEV && (globalThis as unknown as { __crtPageSw?: boolean }).__crtPageSw;
-  const pageSince = holdPage ? 60 : now - v.switchedAt;
-  if ((v.switchedCell === -2 || holdPage) && pageSince < 260) {
-    const amt = 0.9 * (1 - pageSince / 260);
+  const swSince = holdPage ? 60 : now - v.switchedAt;
+  if (swSince < 260) {
+    const amt = 0.9 * (1 - swSince / 260);
+    const paged = v.switchedCell === -2 || holdPage;
     rects.forEach((r, ci) => {
-      if (v.pinned && ci === 0) return;
-      const c = osdFor(ci); // YouTube previews are drawn on the flat overlay, so their static goes there too
+      const isPinned = v.pinned && ci === 0;
+      const hit = paged ? !isPinned : flat.has(ci) && (v.switchedCell === -1 || v.switchedCell === ci);
+      if (!hit) return;
+      const c = osdFor(ci);
       const pat = c.createPattern(noiseTile(), "repeat")!;
       pat.setTransform(new DOMMatrix().translate((Math.random() * 64) | 0, (Math.random() * 64) | 0)); // move the grain each frame
       c.save();
@@ -470,6 +475,7 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
       c.restore();
     });
   }
+
   if (v.pinUi) {
     const r = rects.get(v.pinUi.cell);
     if (r) drawPinUi(osdFor(v.pinUi.cell), r, v.pinUi, v.scale);
