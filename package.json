@@ -19,6 +19,7 @@
     "@fontsource/fusion-pixel-12px-monospaced-tc": "^5.3.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@vercel/analytics": "^2.0.1",
     "astro": "^7.4.13",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
