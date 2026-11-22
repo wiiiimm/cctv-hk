@@ -8,6 +8,8 @@ import { TopBar } from "./deck/TopBar";
 import { Sidebar } from "./deck/Sidebar";
 import { StatusBar } from "./deck/StatusBar";
 import { MobileBar } from "./deck/MobileBar";
+import { ToastView } from "./ToastView";
+import { initPwa } from "../lib/pwa";
 import { NewsTicker } from "./deck/NewsTicker";
 import { useMedia } from "../hooks/useMedia";
 import { useWallGestures } from "../hooks/useWallGestures";
@@ -16,6 +18,8 @@ import { CrtScreen } from "./crt/CrtScreen";
 
 export default function App() {
   useControls();
+  // Offline support: service worker (production only) + offline / update notices.
+  useEffect(() => initPwa(), []);
   const mode = useStore((s) => s.mode);
   const lang = useStore((s) => s.lang);
   const theater = useStore((s) => s.theater);
@@ -111,6 +115,7 @@ export default function App() {
         </div>
       </div>
       {phone ? <MobileBar /> : <StatusBar />}
+      <ToastView />
     </div>
   );
 }

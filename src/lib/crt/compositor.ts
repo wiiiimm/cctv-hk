@@ -1,5 +1,6 @@
 // Draws the security-monitor picture (wall or single feed, plus OSD) into a flat 2D canvas.
 // The CRT renderer then uploads that canvas as a texture.
+import { wxIconImage } from "../wxIcons";
 import { CHANNEL_BY_KEY, fmtNum } from "../channels";
 import { DICTS, chAltName, chName } from "../i18n";
 import type { Lang } from "../store";
@@ -346,7 +347,7 @@ function drawPinUi(ctx: CanvasRenderingContext2D, r: CellRect, ui: NonNullable<S
 
 // ---- News ticker band (CRT): same content and order as the DOM ticker, crawled on the canvas ----
 const TICKER_SPEED = 70; // CSS px per second
-let tickerCache: { items: NewsItem[]; lang: string; fs: number; runs: { tag?: string; tagBg?: string; tagFg?: string; text: string; color: string; tagW: number; textW: number; w: number }[]; total: number } | null = null;
+let tickerCache: { items: NewsItem[]; lang: string; fs: number; runs: { tag?: string; tagBg?: string; tagFg?: string; icon?: number; text: string; color: string; tagW: number; textW: number; w: number }[]; total: number } | null = null;
 
 function drawTicker(ctx: CanvasRenderingContext2D, items: NewsItem[], lang: Lang, x: number, y: number, w: number, h: number, scale: number, now: number) {
   const d = DICTS[lang];
@@ -377,12 +378,16 @@ function drawTicker(ctx: CanvasRenderingContext2D, items: NewsItem[], lang: Lang
   if (!tickerCache || tickerCache.items !== items || tickerCache.lang !== lang || tickerCache.fs !== fs) {
     const gap = fs * 2.2;
     const runs = items.map((it) => {
-      const tag = it.kind === "warn" ? d.newsWarn : it.kind === "traffic" ? d.newsTraffic : undefined;
+      const tag = it.kind === "warn" ? d.newsWarn : it.kind === "traffic" ? d.newsTraffic : it.kind === "weather" ? d.newsWeather : undefined;
+      const iconW = it.icon !== undefined ? fs * 1.25 : 0;
       const time = it.kind !== "traffic" && it.time ? new Date(it.time).toLocaleTimeString("en-GB", { timeZone: "Asia/Hong_Kong", hour: "2-digit", minute: "2-digit" }) + "  " : "";
       const text = time + it.text;
       const tagW = tag ? ctx.measureText(tag).width + fs * 0.7 : 0;
       const textW = ctx.measureText(text).width;
-      return { tag, tagBg: it.kind === "warn" ? "#d71f1f" : "#c27c00", tagFg: it.kind === "warn" ? "#fff" : "#000", text, color: it.kind === "warn" ? "#ff8a80" : "#f2f2f2", tagW, textW, w: (tag ? tagW + fs * 0.5 : 0) + textW + gap };
+      const tagBg = it.kind === "warn" ? "#d71f1f" : it.kind === "weather" ? "#1f6fb8" : "#c27c00";
+      const tagFg = it.kind === "traffic" ? "#000" : "#fff";
+      const color = it.kind === "warn" ? "#ff8a80" : it.kind === "weather" ? "#bfe1ff" : "#f2f2f2";
+      return { tag, tagBg, tagFg, icon: it.icon, text, color, tagW, textW, w: (tag ? tagW + fs * 0.5 : 0) + (iconW ? iconW + fs * 0.35 : 0) + textW + gap };
     });
     tickerCache = { items, lang, fs, runs, total: runs.reduce((a, r) => a + r.w, 0) };
   }
@@ -400,6 +405,12 @@ function drawTicker(ctx: CanvasRenderingContext2D, items: NewsItem[], lang: Lang
           ctx.fillStyle = r.tagFg!;
           ctx.fillText(r.tag, px + fs * 0.35, y + h / 2 + 1);
           px += r.tagW + fs * 0.5;
+        }
+        if (r.icon !== undefined) {
+          const s = fs * 1.25;
+          const img = wxIconImage(r.icon);
+          if (img) ctx.drawImage(img, px, y + (h - s) / 2, s, s);
+          px += s + fs * 0.35;
         }
         ctx.fillStyle = r.color;
         ctx.fillText(r.text, px, y + h / 2 + 1);

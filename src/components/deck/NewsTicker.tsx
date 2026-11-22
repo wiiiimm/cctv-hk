@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { useStore } from "../../lib/store";
 import { useT } from "../../lib/i18n";
 import { useNews } from "../../lib/news";
+import { wxIconSvg } from "../../lib/wxIcons";
 
 const SPEED = 70; // px per second
 
@@ -9,7 +10,8 @@ export const hhmm = (iso?: string) =>
   iso ? new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Hong_Kong", hour: "2-digit", minute: "2-digit" }) : "";
 
 /**
- * Crawling news bar above the bottom bar: HKO warnings in force (red), TD special traffic news (amber), then RTHK
+ * Crawling news bar above the bottom bar: HKO warnings in force (red), HKO weather now / forecast (blue, with a weather
+ * icon), TD special traffic news (amber), then RTHK
  * local headlines — in the viewer's language. Hover (or focus) pauses it; each item links to its source.
  */
 export function NewsTicker({ crt = false, style }: { crt?: boolean; style?: React.CSSProperties } = {}) {
@@ -31,6 +33,8 @@ export function NewsTicker({ crt = false, style }: { crt?: boolean; style?: Reac
         <>
           {it.kind === "warn" && <b className="nt-tag warn">{t.newsWarn}</b>}
           {it.kind === "traffic" && <b className="nt-tag traffic">{t.newsTraffic}</b>}
+          {it.kind === "weather" && <b className="nt-tag weather">{t.newsWeather}</b>}
+          {it.icon !== undefined && <span className="nt-icon" aria-hidden dangerouslySetInnerHTML={{ __html: wxIconSvg(it.icon) }} />}
           {it.kind !== "traffic" && it.time && <span className="nt-time">{hhmm(it.time)}</span>}
           <span className="nt-text">{it.text}</span>
         </>

@@ -509,6 +509,10 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .nt-tag { font: 600 10px/16px var(--sans); letter-spacing: 0.08em; padding: 0 5px; border-radius: 2px; }
 .nt-tag.warn { background: var(--rec); color: #fff; }
 .nt-tag.traffic { background: #c27c00; color: #000; }
+.nt-tag.weather { background: #1f6fb8; color: #fff; }
+.nt-icon { display: inline-flex; flex: none; width: 20px; height: 20px; }
+.nt-icon svg { width: 100%; height: 100%; }
+.nt-item.weather .nt-text { color: #bfe1ff; }
 .nt-item.warn .nt-text { color: #ff8a80; }
 @media (prefers-reduced-motion: reduce) {
   .nt-track { animation: none; padding-left: 12px; }
@@ -554,3 +558,9 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 /* CRT veil (power-on / whole-wall change): live layers hide so the shader's warm-up / static shows, then fade in. */
 .crt-video, .crt-overlay-host { transition: opacity 0.25s ease-out; }
 .crt-video.veiled, .crt-overlay-host.veiled { opacity: 0; transition: none; }
+
+/* App toast (offline / online, update ready). */
+.app-toast { position: fixed; left: 50%; bottom: calc(48px + env(safe-area-inset-bottom)); translate: -50% 0; z-index: 90; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 24px); padding: 9px 10px 9px 14px; border-radius: var(--r); background: var(--panel-3); border: 1px solid var(--line-2); color: var(--text); font: 13px var(--sans); box-shadow: 0 10px 30px #0009; animation: toast-in 0.25s ease-out; }
+.app-toast button { height: 28px; padding: 0 12px; border: 0; border-radius: var(--r-sm); background: var(--sel); color: var(--sel-ink); font: 600 12px var(--sans); cursor: pointer; }
+.app-toast:not(:has(button)) { padding-right: 14px; }
+@keyframes toast-in { from { opacity: 0; translate: -50% 10px; } }

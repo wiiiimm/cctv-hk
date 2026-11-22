@@ -60,7 +60,8 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   `window.__crtFx = { on: true, t: 0.2 }` to freeze a moment for inspection. GLSL: never call smoothstep with descending edges.
 - i18n: `lib/i18n.ts` (en / zh-Hant). Primary language leads; the other language shows as secondary info wherever there is room.
   Feed OSD font is VT323 for Latin + Fusion Pixel 12px Monospaced TC (OFL, `@fontsource`) for Chinese.
-- News ticker: `src/pages/api/news.ts` relays fixed upstreams only (HKO warnsum JSON, TD special traffic news XML,
+- News ticker: `src/pages/api/news.ts` relays fixed upstreams only (HKO warnsum JSON, HKO current weather `rhrread` + local forecast `flw` → kind "weather" with an HKO icon code drawn
+  by `lib/wxIcons.ts` in both the DOM and CRT tickers, TD special traffic news XML,
   RTHK local RSS — RTHK has no CORS) as one JSON list per language; `lib/news.ts` polls it (3 min) for both views.
   The DOM ticker (`components/deck/NewsTicker.tsx`) sits at the top of the viewer column (never over the sidebar);
   in CRT mode `crtLayout` / the compositor reserve `CRT_NEWS_H` for it. Flat vs curved is decided in one place,
@@ -110,6 +111,17 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   stepping back); TD speed-map panels (261–265) loaded directly via `Channel.src` (`{lang}` → tc / en). Radar / satellite are also in
   "HKO weather"; the panels in "Traffic" and their HK district / region groups.
 - `src/pages/api/snap.ts` — same-origin relay for HKO photos, radar and satellite (no CORS upstream). Allow-listed codes only.
+
+## Offline / PWA
+
+- `public/sw.js` (production builds only — `<meta name="service-worker">` is "on" when PROD; modelled on midi-mixer):
+  installs the app shell by reading `/` and following its `_astro` bundles (JS imports, CSS fonts); pages are
+  network-first (4s) with the cached shell offline; `_astro` cache-first. "Last picture" caches: TD / HKO / radar /
+  speed-map / YouTube thumbnails are network-first and keyed without the `t` cache-buster, so offline every tile shows
+  its last image (age stamp goes amber); OSM tiles cache-first; `/api/news` and `/api/ytlive` network-first; caches are
+  size-capped. Bump `VERSION` in sw.js when the caching logic changes.
+- `src/lib/pwa.ts` registers it, offers "A new version is ready → Reload", and shows offline / online notices via
+  `lib/toast.ts` (`notify`, rendered by `components/ToastView.tsx`). Installable: `manifest.webmanifest` + icons.
 
 ## Design tokens
 
