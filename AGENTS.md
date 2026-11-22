@@ -24,6 +24,8 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   + below — the classic 1+N) or "wide" (block as wide as fits, previews either side + below). Previews and the pinned
   block share one regular grid so every preview is the same size and aligned. Enter/double-click step up, Esc down;
   clicking a small tile while pinned pins it instead; unpinning returns the video to its original cell (`pinFrom`).
+  **Requirement:** a preview is never as large as the pinned video — `arrange` checks every pinned layout (each
+  preview ≤ half the pinned width and shorter) and shrinks previews until it holds; "side" needs at least a 2×2 block.
   Switching camera group keeps the pin only if the pinned channel is in the new group; otherwise the pin is released
   (same rule when restoring saved state). The wall never shows a channel twice.
 - Phones / small tablets: below 1100px the top bar is one row (☰, brand, PATROL, CRT, ⋯ sheet with the rest);

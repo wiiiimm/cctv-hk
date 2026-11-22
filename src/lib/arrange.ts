@@ -153,7 +153,21 @@ export function arrange(a: ArrangeInput): Arrangement {
     return { rects: gridRects(g, gap, capacity), capacity, kind: "grid" };
   }
 
-  if (a.pinMode === "wide") return wideLayout(w, h, p, gap, flex, aspect, pinAspect);
+  // Requirement: a preview is never as large as the pinned video. Every pinned layout is checked, and previews
+  // shrink until each is at most half the pinned width and shorter than it.
+  for (let q = p, tries = 0; ; q *= 0.8, tries++) {
+    const res = pinnedLayout(a.pinMode, w, h, q, gap, flex, aspect, pinAspect);
+    if (previewsSmaller(res.rects) || tries >= 8 || q < 48) return res;
+  }
+}
+
+function previewsSmaller(rects: Rect[]): boolean {
+  const [pin, ...previews] = rects;
+  return !!pin && previews.every((r) => r.w <= pin.w / 2 + 0.5 && r.h < pin.h);
+}
+
+function pinnedLayout(pinMode: PinMode, w: number, h: number, p: number, gap: number, flex: number, aspect: number, pinAspect: number): Arrangement {
+  if (pinMode === "wide") return wideLayout(w, h, p, gap, flex, aspect, pinAspect);
 
   // Side: one regular grid of equal previews; the pinned video covers a span×span block of cells top-left, so the
   // column beside it and the row below are the same size and aligned.
@@ -165,6 +179,8 @@ export function arrange(a: ArrangeInput): Arrangement {
     g = bestGrid(w, h, q, gap, flex, aspect);
   }
   const span = Math.max(1, Math.min(g.cols - 1, g.rows - 1));
+  // A 1×1 "block" would be just another preview: use the wide arrangement instead.
+  if (span < 2) return wideLayout(w, h, p, gap, flex, aspect, pinAspect);
   const cell = (c: number, r: number, n = 1): Rect => ({
     x: g.x + gap + c * (g.cellW + gap),
     y: g.y + gap + r * (g.cellH + gap),
@@ -198,9 +214,13 @@ function wideLayout(w: number, h: number, p: number, gap: number, flex: number, 
     const rects: Rect[] = [{ x: gap, y: gap, w: bigW, h: fullH }, ...rest];
     return { rects, capacity: rects.length, kind: "wide" };
   }
+  // Previews under a full-width picture are never full width themselves (they'd look like a second pinned video):
+  // at least two across, whatever the preview size.
+  p = Math.min(p, (w - gap * 3) / 2);
+  const minRowH = (p / aspect) * 0.8;
   let bigH = Math.min(fullW / pinAspect, h * 0.6);
   // Always leave at least one preview row.
-  bigH = Math.max(40, Math.min(bigH, h - gap * 3 - minPrevH));
+  bigH = Math.max(40, Math.min(bigH, h - gap * 3 - minRowH));
   const top = gap + bigH;
   const rest = fillBox(0, top, w, h - top, p, gap, flex, aspect);
   // The previews' grid may be centred with spare height; give it back to the picture (up to its natural height).
