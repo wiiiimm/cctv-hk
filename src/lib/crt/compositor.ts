@@ -36,6 +36,8 @@ export interface ScreenView {
    * (left → right), and their opacity. Invisible DOM buttons on top handle the clicks.
    */
   pinUi?: { cell: number; buttons: { icon: IconName; on: boolean }[]; opacity: number };
+  /** Feeds available for the wall (re-fits small groups, same as the DOM wall). */
+  count?: number;
   /** Safe margin (fraction of each side) so the wall clears the tube's curved edge and vignette. */
   inset: number;
 }
@@ -91,8 +93,23 @@ function caption(ctx: CanvasRenderingContext2D, s: string, x: number, y: number,
   ctx.fillText(s, x, y);
 }
 
-/** Steady status badge, right-aligned at (right, y): white text on a red (or amber) block. */
-function badge(ctx: CanvasRenderingContext2D, label: string, right: number, y: number, size: number, bg: string) {
+/** Phones: preview badges become a dot (the pinned / full tile keeps its label), matching the DOM wall. */
+const phoneMq = typeof window !== "undefined" ? window.matchMedia("(max-width: 760px)") : null;
+
+/** Steady status badge, right-aligned at (right, y): white text on a red (or amber) block — or just a dot. */
+function badge(ctx: CanvasRenderingContext2D, label: string, right: number, y: number, size: number, bg: string, dot = false) {
+  if (dot) {
+    const r = size * 0.32;
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.beginPath();
+    ctx.arc(right - r, y + size * 0.5, r + size * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.arc(right - r, y + size * 0.5, r, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
   ctx.font = `${size}px ${OSD}`;
   const tw = ctx.measureText(label).width;
   const px = size * 0.35;
@@ -145,10 +162,10 @@ function drawCell(ctx: CanvasRenderingContext2D, key: string, x: number, y: numb
     caption(ctx, t.kind[ch.kind].toUpperCase(), x + pad + tw + fs * 0.7, y + pad * 0.6, fs);
   } else caption(ctx, `CH${fmtNum(ch.num)} ${t.kind[ch.kind].toUpperCase()}`, x + pad, y + pad * 0.6, fs);
   if (ch.kind === "yt") {
-    if (snap.live) badge(ctx, t.live, x + w - pad, y + pad * 0.6, fs, "#d71f1f");
+    if (snap.live) badge(ctx, t.live, x + w - pad, y + pad * 0.6, fs, "#d71f1f", !!phoneMq?.matches && !big);
   } else {
     const stale = snap.takenAt && now - snap.takenAt > ch.refreshMs * 3;
-    badge(ctx, stale ? t.stale : t.rec, x + w - pad, y + pad * 0.6, fs, stale ? "#c27c00" : "#d71f1f");
+    badge(ctx, stale ? t.stale : t.rec, x + w - pad, y + pad * 0.6, fs, stale ? "#c27c00" : "#d71f1f", !!phoneMq?.matches && !big);
   }
   // Primary language always; the other language too when the cell is wide enough.
   ctx.font = `${fs}px ${OSD}`;
@@ -298,7 +315,7 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
   // Same arrangement as the DOM wall, inside the tube's safe area.
   const mx = w * v.inset;
   const my = h * v.inset;
-  const layout = arrange({ w: w - mx * 2, h: h - my * 2, previewW: v.previewW * v.scale, pinned: v.pinned, pinMode: v.pinMode, solo: v.single, gap });
+  const layout = arrange({ w: w - mx * 2, h: h - my * 2, previewW: v.previewW * v.scale, pinned: v.pinned, pinMode: v.pinMode, solo: v.single, gap, count: v.count });
   const indices = v.single ? [v.selected] : v.cells.map((_, i) => i).slice(0, layout.rects.length);
 
   indices.forEach((ci, slot) => {

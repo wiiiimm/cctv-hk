@@ -13,8 +13,8 @@ export function Sidebar({ onPick, onClose }: { onPick?: () => void; onClose?: ()
     <aside className="sidebar">
       <div className="drawer-head">
         <span>{t.guide}</span>
-        <button type="button" className="drawer-close" onClick={onClose} aria-label={t.closeMenu} title={t.closeMenu}>
-          ×
+        <button type="button" className="drawer-close" onClick={onClose} aria-label={t.hideSidebar} title={`${t.hideSidebar} (T)`}>
+          «
         </button>
       </div>
       <FocusPanel compact />

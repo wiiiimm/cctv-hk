@@ -1,5 +1,5 @@
 // WebGL post-processing pass that turns a flat canvas into a colour CRT picture.
-import type { CrtPreset } from "./presets";
+import { crtCurvature, type CrtPreset } from "./presets";
 
 const VERT = `
 attribute vec2 aPos;
@@ -301,7 +301,7 @@ export class CrtRenderer {
     const f = (k: U, v: number) => gl.uniform1f(this.u[k], v);
     gl.uniform2f(this.u.uRes, width, height);
     f("uTime", t);
-    f("uCurv", p.curvature);
+    f("uCurv", crtCurvature(p));
     f("uScan", p.scanline);
     f("uScanCount", p.scanCount);
     f("uMask", p.mask);

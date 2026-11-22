@@ -164,6 +164,12 @@ export function useStore<T>(pick: (s: State) => T): T {
 
 export const groupKeysOf = groupKeys;
 
+/** Distinct feeds the wall can show for the current group (the pinned one counted once, even if from elsewhere). */
+export function feedCount(s: State): number {
+  const keys = groupKeys(s);
+  return keys.length + (s.pinned && s.cells[0] && !keys.includes(s.cells[0]) ? 1 : 0);
+}
+
 /**
  * Resize the cell list to `n`: keep what is on screen, then continue through the group. A channel is never
  * shown twice; if the group runs out, the remaining slots stay empty.

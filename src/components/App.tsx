@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 
 /** How long the CRT stays mounted after switch-off so the collapse-to-dot can play. */
 const CRT_OFF_MS = 950;
-import { useStore } from "../lib/store";
+import { actions, useStore } from "../lib/store";
 import { useControls } from "../hooks/useControls";
 import { TopBar } from "./deck/TopBar";
 import { Sidebar } from "./deck/Sidebar";
 import { StatusBar } from "./deck/StatusBar";
+import { MobileBar } from "./deck/MobileBar";
+import { useMedia } from "../hooks/useMedia";
 import { VideoWall } from "./monitor/VideoWall";
 import { CrtScreen } from "./crt/CrtScreen";
 
@@ -16,6 +18,21 @@ export default function App() {
   const lang = useStore((s) => s.lang);
   const theater = useStore((s) => s.theater);
   const [guideOpen, setGuideOpen] = useState(false);
+  // One "show / hide sidebar" control at every width: a slide-out drawer below 1180px, a collapsible column above.
+  // Re-rendered live when the window crosses a breakpoint (resize / rotate).
+  const narrowNow = useMedia("(max-width: 1180px)");
+  const phone = useMedia("(max-width: 760px)");
+  const toggleSidebar = () => (window.innerWidth <= 1180 ? setGuideOpen((v) => !v) : actions.toggleTheater());
+  const sidebarShown = narrowNow ? guideOpen : !theater;
+  // Leaving drawer mode closes the drawer so it doesn't reappear stale.
+  useEffect(() => {
+    if (!narrowNow) setGuideOpen(false);
+  }, [narrowNow]);
+  useEffect(() => {
+    const onToggle = () => toggleSidebar();
+    window.addEventListener("cctv:toggle-sidebar", onToggle);
+    return () => window.removeEventListener("cctv:toggle-sidebar", onToggle);
+  });
   // Esc closes the drawer first (before Esc's usual unpin / deselect).
   useEffect(() => {
     if (!guideOpen) return;
@@ -47,9 +64,9 @@ export default function App() {
 
   return (
     <div className={`app mode-${mode} lang-${lang}${theater ? " theater" : ""}${guideOpen ? " guide-open" : ""}`}>
-      <TopBar onGuide={() => setGuideOpen((v) => !v)} guideOpen={guideOpen} />
+      <TopBar onGuide={toggleSidebar} sidebarShown={sidebarShown} />
       <div className="body">
-        <Sidebar onPick={() => setGuideOpen(false)} onClose={() => setGuideOpen(false)} />
+        <Sidebar onPick={() => setGuideOpen(false)} onClose={toggleSidebar} />
         {/* Drawer mode only (hidden on wide screens): click outside the drawer to close it. */}
         {guideOpen && <div className="drawer-backdrop" onClick={() => setGuideOpen(false)} aria-hidden />}
         {/* CRT is a picture mode of the same viewer, not a separate screen. */}
@@ -57,7 +74,7 @@ export default function App() {
           {mode === "crt" || crtExit ? <CrtScreen exiting={mode !== "crt"} /> : <VideoWall />}
         </main>
       </div>
-      <StatusBar />
+      {phone ? <MobileBar /> : <StatusBar />}
     </div>
   );
 }

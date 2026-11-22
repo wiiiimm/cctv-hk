@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { arrange, publishGeometry } from "../../lib/arrange";
-import { actions, useStore } from "../../lib/store";
+import { actions, feedCount, useStore } from "../../lib/store";
 import { Tile } from "./Tile";
 
 export const WALL_GAP = 3;
@@ -21,10 +21,12 @@ export function VideoWall() {
   }, []);
 
   const solo = focused;
-  const layout = arrange({ w: area.w, h: area.h, previewW: previewSize, pinned, pinMode, solo, gap: WALL_GAP });
+  const count = useStore(feedCount);
+  const layout = arrange({ w: area.w, h: area.h, previewW: previewSize, pinned, pinMode, solo, gap: WALL_GAP, count });
 
   // Adopt the capacity (not while solo: the previews are just hidden, so keep them).
-  const capacity = layout.rects.length;
+  // Report what the stage holds at this size (not just what a small group fills), so paging stays one screenful.
+  const capacity = layout.capacity;
   useEffect(() => {
     if (!solo && capacity > 0) actions.setCapacity(capacity);
   }, [capacity, solo]);

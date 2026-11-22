@@ -37,3 +37,8 @@
     display: none;
   }
 }
+
+/* Phones: status badges on previews shrink to a dot (the pinned / full tile keeps its full label). */
+@media (max-width: 760px) {
+  .tile:not(.large) .osd-tr .badge { font-size: 0; width: 10px; height: 10px; padding: 0; border-radius: 50%; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6); }
+}

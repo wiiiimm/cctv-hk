@@ -13,7 +13,9 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   `lib/crt/compositor.ts` draws the wall + OSD into a 2D canvas, `lib/crt/renderer.ts` runs it through a WebGL colour-CRT
   shader (`lib/crt/presets.ts` holds the looks). Keep curvature gentle; the compositor insets the wall so nothing clips.
   YouTube can't be drawn into WebGL, so a focused live stream is an iframe over the canvas with CSS-only CRT effects.
-- Cells are 4:3 (`lib/layout.ts`), matching TD's 320×240 snapshots; 16:9 feeds letterbox, never crop.
+- Cells are about 4:3 (`lib/layout.ts`), matching TD's 320×240 snapshots; `arrange` lets them flex ±15% (`FLEX`) so the
+  grid fills the stage exactly. 16:9 feeds letterbox, never crop. A group smaller than the grid is re-fitted to its
+  count (bigger tiles); `capacity` still reports the full grid so paging / patrol move by one screenful.
 - Layout is responsive and always fills the screen (`lib/arrange.ts`, one engine for the DOM wall, the CRT compositor,
   CRT click mapping and arrow-key navigation via `publishGeometry`/`neighbour`). The user sets a **preview size**
   (`previewSize`, px of tile width; slider / L, Shift+L); the wall shows as many 4:3 previews as fit and reports that
@@ -24,6 +26,10 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   clicking a small tile while pinned pins it instead; unpinning returns the video to its original cell (`pinFrom`).
   Switching camera group keeps the pin only if the pinned channel is in the new group; otherwise the pin is released
   (same rule when restoring saved state). The wall never shows a channel twice.
+- Phones / small tablets: below 1100px the top bar is one row (☰, brand, PATROL, CRT, ⋯ sheet with the rest);
+  below 760px `MobileBar` replaces the status bar (camera actions or group + pager); no bottom bar under 500px
+  high. Preview badges become dots below 760px (not on the pinned / full tile). CRT curvature is 30% on phones
+  (`crtCurvature`). Breakpoints re-render live via `useMedia`.
 - No right sidebar. The selected (or pinned) video's details + map sit at the top of the left sidebar
   (`components/deck/Sidebar.tsx`), above the channel guide. Theatre mode (`T`) hides the whole sidebar.
 - Camera groups (`buildGroups` in `lib/channels.ts`): feed types, topic groups (`TOPICS`: curated keys + TD-name regex /

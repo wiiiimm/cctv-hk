@@ -82,7 +82,8 @@ export function useControls() {
             break;
           case "t":
           case "T":
-            actions.toggleTheater();
+            // Same as ☰: the App decides (drawer below 1180px, collapse above).
+            window.dispatchEvent(new CustomEvent("cctv:toggle-sidebar"));
             break;
           case "g":
           case "G":
