@@ -7,6 +7,7 @@ import { PinControls, type PinRole } from "./PinControls";
 import { ago, hkStamp, useClock } from "../../hooks/useClock";
 import "./osd.css";
 import { useYouTubeErrors } from "../../hooks/useYouTubeErrors";
+import { lastTouchAt } from "../../hooks/useWallGestures";
 
 interface Props {
   /** Which pin controls to show on this tile, if any. */
@@ -40,8 +41,18 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
     <div
       className={`tile${selected ? " selected" : ""}${large ? " large" : ""}`}
       // Pinned: clicking a small tile pins it instead. Double-click steps up a pin level (solo toggles back).
-      onClick={() => (store.get().pinned && !store.get().focused ? actions.pin(index) : actions.select(index))}
-      onDoubleClick={() => (store.get().focused ? actions.unfocus() : actions.escalate(index))}
+      onClick={(e) => {
+        const touch = (e.nativeEvent as PointerEvent).pointerType === "touch" || Date.now() - lastTouchAt < 600;
+        if (store.get().focused) return;
+        actions.tap(index, touch);
+      }}
+      // Touch has its own second-tap step (see actions.tap); a finger double-tap must not step twice.
+      onDoubleClick={() => {
+        if (Date.now() - lastTouchAt < 800) return;
+        if (store.get().focused) actions.unfocus();
+        else actions.escalate(index);
+      }}
+      data-index={index}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         const key = e.dataTransfer.getData("text/x-channel");

@@ -38,6 +38,8 @@ export interface ScreenView {
   pinUi?: { cell: number; buttons: { icon: IconName; on: boolean }[]; opacity: number };
   /** Feeds available for the wall (re-fits small groups, same as the DOM wall). */
   count?: number;
+  aspect?: number;
+  pinAspect?: number;
   /** Safe margin (fraction of each side) so the wall clears the tube's curved edge and vignette. */
   inset: number;
 }
@@ -315,7 +317,7 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
   // Same arrangement as the DOM wall, inside the tube's safe area.
   const mx = w * v.inset;
   const my = h * v.inset;
-  const layout = arrange({ w: w - mx * 2, h: h - my * 2, previewW: v.previewW * v.scale, pinned: v.pinned, pinMode: v.pinMode, solo: v.single, gap, count: v.count });
+  const layout = arrange({ w: w - mx * 2, h: h - my * 2, previewW: v.previewW * v.scale, pinned: v.pinned, pinMode: v.pinMode, solo: v.single, gap, count: v.count, aspect: v.aspect, pinAspect: v.pinAspect });
   const indices = v.single ? [v.selected] : v.cells.map((_, i) => i).slice(0, layout.rects.length);
 
   indices.forEach((ci, slot) => {

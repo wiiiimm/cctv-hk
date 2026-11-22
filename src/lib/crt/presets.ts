@@ -222,7 +222,8 @@ export function crtCurvature(p: CrtPreset): number {
 }
 
 /** Margin (fraction per side) that keeps picture content clear of the curved, vignetted tube edge. */
-export const crtInset = (curvature: number) => 0.012 + curvature * 0.35;
+export const crtInset = (curvature: number) =>
+  (typeof window !== "undefined" && Math.min(window.innerWidth, window.innerHeight) < 600 ? 0.005 : 0.012) + curvature * 0.35;
 
 export const PRESET_IDS = PRESETS.map((p) => p.id);
 export const presetById = (id: string) => PRESETS.find((p) => p.id === id) ?? PRESETS[0];

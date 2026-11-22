@@ -30,6 +30,13 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   below 760px `MobileBar` replaces the status bar (camera actions or group + pager); no bottom bar under 500px
   high. Preview badges become dots below 760px (not on the pinned / full tile). CRT curvature is 30% on phones
   (`crtCurvature`). Breakpoints re-render live via `useMedia`.
+- Shapes: `feedAspect` (TD 4:3; HKO 720×405 and YouTube 16:9). Groups that are all 16:9 get 16:9 cells (`wallAspect`);
+  the pinned / full picture uses its own shape (`bigAspect`). "Wide" pin on short stages puts the picture left and
+  previews right. Portrait full view shows the camera panel under the picture (DOM wall only).
+- Touch (`hooks/useWallGestures.ts`, on the stage, DOM + CRT): swipe ←/→ pages (channel in full view), swipe ↓ steps
+  down a pin level, long-press selects + opens the details, pinch sets preview size. `actions.tap`: on touch, tapping
+  the selected preview pins it and tapping the pinned video goes full; finger double-taps are ignored. Landscape phone
+  full view hides the top bar after 3s.
 - No right sidebar. The selected (or pinned) video's details + map sit at the top of the left sidebar
   (`components/deck/Sidebar.tsx`), above the channel guide. Theatre mode (`T`) hides the whole sidebar.
 - Camera groups (`buildGroups` in `lib/channels.ts`): feed types, topic groups (`TOPICS`: curated keys + TD-name regex /

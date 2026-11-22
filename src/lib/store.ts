@@ -1,6 +1,6 @@
 // App state for the viewing engine. The console UI and the CRT shell both read and drive this one store.
 import { useSyncExternalStore } from "react";
-import { CHANNELS, CHANNEL_BY_KEY, CHANNEL_BY_NUM, GROUP_BY_ID } from "./channels";
+import { CHANNELS, CHANNEL_BY_KEY, CHANNEL_BY_NUM, GROUP_BY_ID, feedAspect } from "./channels";
 import { PREVIEW_DEFAULT, PREVIEW_MAX, PREVIEW_MIN, PREVIEW_STEP, liveGeometry, neighbour, type PinMode } from "./arrange";
 
 export type Mode = "console" | "crt";
@@ -163,6 +163,17 @@ export function useStore<T>(pick: (s: State) => T): T {
 }
 
 export const groupKeysOf = groupKeys;
+
+/** Preview cell shape: 16:9 when every feed in the group is 16:9 (weather, live video), else 4:3. */
+export function wallAspect(s: State): number {
+  const keys = groupKeys(s);
+  return keys.length && keys.every((k) => feedAspect(CHANNEL_BY_KEY.get(k)) > 1.5) ? 16 / 9 : 4 / 3;
+}
+
+/** Shape of the big picture: the pinned video, or the one shown full. */
+export function bigAspect(s: State): number {
+  return feedAspect(CHANNEL_BY_KEY.get(s.cells[s.focused ? Math.max(0, s.selected) : 0]));
+}
 
 /** Distinct feeds the wall can show for the current group (the pinned one counted once, even if from elsewhere). */
 export function feedCount(s: State): number {
@@ -370,6 +381,19 @@ export const actions = {
   clearEntry() {
     clearTimeout(entryTimer);
     update({ entry: "" });
+  },
+  /**
+   * A tap / click on tile i. Mouse: select (or, while pinned, pin it). Touch adds a second step so one finger can do
+   * everything: tapping the selected preview pins it, tapping the pinned video shows it full.
+   */
+  tap(i: number, touch = false) {
+    const s = get();
+    if (s.focused) return;
+    if (s.pinned) {
+      if (touch && i === 0) actions.focus(0);
+      else actions.pin(i);
+    } else if (touch && s.selected === i) actions.pin(i);
+    else actions.select(i);
   },
   select(i: number) {
     update((s) => ({ selected: Math.max(0, Math.min(s.cells.length - 1, i)) }));

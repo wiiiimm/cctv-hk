@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { arrange, publishGeometry } from "../../lib/arrange";
-import { actions, feedCount, useStore } from "../../lib/store";
+import { actions, bigAspect, feedCount, useStore, wallAspect } from "../../lib/store";
+import { FocusPanel } from "../deck/FocusPanel";
 import { Tile } from "./Tile";
 
 export const WALL_GAP = 3;
@@ -22,7 +23,12 @@ export function VideoWall() {
 
   const solo = focused;
   const count = useStore(feedCount);
-  const layout = arrange({ w: area.w, h: area.h, previewW: previewSize, pinned, pinMode, solo, gap: WALL_GAP, count });
+  const aspect = useStore(wallAspect);
+  const pinAspect = useStore(bigAspect);
+  const layout = arrange({ w: area.w, h: area.h, previewW: previewSize, pinned, pinMode, solo, gap: WALL_GAP, count, aspect, pinAspect });
+  // Portrait full view: the picture moves to the top and the camera panel uses the space below it.
+  const soloInfo = solo && layout.rects[0] && area.h - layout.rects[0].h >= 160 && area.h > area.w;
+  if (soloInfo) layout.rects[0] = { ...layout.rects[0], y: 0 };
 
   // Adopt the capacity (not while solo: the previews are just hidden, so keep them).
   // Report what the stage holds at this size (not just what a small group fills), so paging stays one screenful.
@@ -64,6 +70,11 @@ export function VideoWall() {
             </div>
           );
         })}
+      {soloInfo && (
+        <div className="solo-info" style={{ top: layout.rects[0].h }}>
+          <FocusPanel compact />
+        </div>
+      )}
     </div>
   );
 }

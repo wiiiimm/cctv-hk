@@ -223,8 +223,16 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .guide-toggle.on { color: var(--sel); }
 .drawer-backdrop { display: none; }
 
+/* Portrait full view: camera panel under the picture. */
+.solo-info { position: absolute; left: 0; right: 0; bottom: 0; overflow-y: auto; padding: var(--sp-2); background: var(--panel); border-top: 1px solid var(--line); font-family: var(--sans); color: var(--text); }
+.solo-info .panel { border: 0; background: none; padding: 0; }
+
+/* Safe areas (notches, home indicator) — viewport-fit=cover is set. */
+.topbar { padding-top: max(var(--sp-2), env(safe-area-inset-top)); padding-left: max(var(--sp-3), env(safe-area-inset-left)); padding-right: max(var(--sp-3), env(safe-area-inset-right)); }
+.sidebar { padding-bottom: env(safe-area-inset-bottom); }
+
 /* ---------- phone bottom bar (replaces the status bar below 760px) ---------- */
-.mobilebar { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); min-height: 44px; padding: 6px var(--sp-2) calc(6px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); }
+.mobilebar { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); min-height: 44px; padding: 6px max(var(--sp-2), env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(var(--sp-2), env(safe-area-inset-left)); background: var(--panel); border-top: 1px solid var(--line); }
 .mb-cam, .mb-group { min-width: 0; display: flex; align-items: baseline; gap: 6px; padding: 0 4px; border: 0; background: none; color: var(--text); font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .mb-cam b { font: 600 13px var(--mono); flex: none; }
 .mb-cam span { overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
@@ -431,3 +439,16 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
   .brand-dot, .tile-nosignal, .minimap-pin::after { animation: none; }
   .sidebar, .icon-btn, .pill, .btn, .rm-key, .lay, .guide-toggle, .search, .fav, .guide-list li, .topbar select, .field select { transition: none; }
 }
+
+/* Landscape safe areas: keep the picture clear of notches (after the base .wall-area / .crt-tube rules). */
+@media (orientation: landscape) { .wall-area, .crt-tube { inset: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); } }
+
+/* Touch: the wall handles swipes / pinch itself; the hover-only corner pin controls stay visible. */
+@media (hover: none) {
+  .stage { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .pin-controls.selected, .pin-controls.pinned, .pin-controls.solo { opacity: 0.85; }
+}
+/* Landscape full view on phones: bars slide away after a few seconds. */
+.app.chrome-hidden { grid-template-rows: 1fr; }
+.app.chrome-hidden .topbar { display: none; }
+.solo-info { touch-action: pan-y; }

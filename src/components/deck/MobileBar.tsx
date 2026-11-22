@@ -4,7 +4,7 @@ import { chName, groupLabel, useT } from "../../lib/i18n";
 import { IconButton, PinToggle } from "../PinButtons";
 import { ExitSoloIcon, SoloIcon } from "../icons";
 
-const openDrawer = () => window.dispatchEvent(new CustomEvent("cctv:toggle-sidebar"));
+const openDrawer = () => window.dispatchEvent(new CustomEvent("cctv:open-sidebar"));
 
 /**
  * Phone bottom bar (replaces the status bar below 760px), in thumb reach.

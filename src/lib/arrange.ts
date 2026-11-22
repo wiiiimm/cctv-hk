@@ -34,8 +34,12 @@ export interface ArrangeInput {
   gap: number;
   /** Feeds available for this wall (pinned one included). Fewer than the grid holds → re-fit to this count. */
   count?: number;
-  /** How far a cell may stretch from 4:3 (0 = strict 4:3). */
+  /** How far a cell may stretch from its shape (0 = strict). */
   flex?: number;
+  /** Preview cell shape (default 4:3; 16:9 for all-16:9 groups). */
+  aspect?: number;
+  /** Shape of the pinned / full picture (default 4:3). */
+  pinAspect?: number;
 }
 
 export interface Arrangement {
@@ -64,28 +68,28 @@ interface GridFit {
 }
 
 /** Fit a cols × rows grid into w×h: fill the width, fill the height within the flex range, centre any leftover. */
-function fitGrid(w: number, h: number, cols: number, rows: number, gap: number, flex: number): GridFit {
+function fitGrid(w: number, h: number, cols: number, rows: number, gap: number, flex: number, aspect = CELL_ASPECT): GridFit {
   let cellW = (w - gap * (cols + 1)) / cols;
   let cellH = (h - gap * (rows + 1)) / rows;
-  const minH = cellW / (CELL_ASPECT * (1 + flex)); // widest allowed shape
-  const maxH = cellW / (CELL_ASPECT * (1 - flex)); // tallest allowed shape
+  const minH = cellW / (aspect * (1 + flex)); // widest allowed shape
+  const maxH = cellW / (aspect * (1 - flex)); // tallest allowed shape
   if (cellH > maxH) cellH = maxH; // too much height: cap it, leftover is centred
-  if (cellH < minH) cellW = cellH * CELL_ASPECT * (1 + flex); // too little height: narrow the cells instead
+  if (cellH < minH) cellW = cellH * aspect * (1 + flex); // too little height: narrow the cells instead
   const usedW = cellW * cols + gap * (cols + 1);
   const usedH = cellH * rows + gap * (rows + 1);
   return { cols, rows, cellW, cellH, x: (w - usedW) / 2, y: (h - usedH) / 2 };
 }
 
 /** The best grid for ~p-wide cells in w×h: fills the stage while staying close to the asked size. */
-export function bestGrid(w: number, h: number, p: number, gap: number, flex = FLEX): GridFit {
+export function bestGrid(w: number, h: number, p: number, gap: number, flex = FLEX, aspect = CELL_ASPECT): GridFit {
   const c0 = Math.max(1, Math.floor((w - gap) / (p + gap)));
   let best: (GridFit & { score: number }) | null = null;
   for (const cols of [c0, c0 + 1]) {
     const cellW = (w - gap * (cols + 1)) / cols;
     if (cols > c0 && cellW < 0.8 * p) continue;
-    const rf = (h - gap) / (cellW / CELL_ASPECT + gap);
+    const rf = (h - gap) / (cellW / aspect + gap);
     for (const rows of new Set([Math.max(1, Math.floor(rf)), Math.max(1, Math.ceil(rf))])) {
-      const f = fitGrid(w, h, cols, rows, gap, flex);
+      const f = fitGrid(w, h, cols, rows, gap, flex, aspect);
       const covered = (f.cellW * f.cellH * cols * rows) / (w * h);
       const score = covered - 0.25 * Math.abs(f.cellW - p) / p;
       if (!best || score > best.score) best = { ...f, score };
@@ -95,10 +99,10 @@ export function bestGrid(w: number, h: number, p: number, gap: number, flex = FL
 }
 
 /** Biggest-cell grid for exactly `count` tiles in w×h (used when a group has fewer feeds than the grid holds). */
-function countGrid(w: number, h: number, count: number, maxCols: number, gap: number, flex: number): GridFit {
+function countGrid(w: number, h: number, count: number, maxCols: number, gap: number, flex: number, aspect: number): GridFit {
   let best: GridFit | null = null;
   for (let cols = 1; cols <= Math.max(1, Math.min(maxCols, count)); cols++) {
-    const f = fitGrid(w, h, cols, Math.ceil(count / cols), gap, flex);
+    const f = fitGrid(w, h, cols, Math.ceil(count / cols), gap, flex, aspect);
     if (!best || f.cellW * f.cellH > best.cellW * best.cellH) best = f;
   }
   return best!;
@@ -118,44 +122,47 @@ function gridRects(f: GridFit, gap: number, n: number, ox = 0, oy = 0): Rect[] {
 }
 
 /** Fill a box with ~previewW tiles (exact-fill grid). Kept for callers that tile a sub-area. */
-export function fillBox(x: number, y: number, w: number, h: number, previewW: number, gap: number, flex = FLEX): Rect[] {
+export function fillBox(x: number, y: number, w: number, h: number, previewW: number, gap: number, flex = FLEX, aspect = CELL_ASPECT): Rect[] {
   if (w <= 0 || h <= 0) return [];
-  const f = bestGrid(w, h, previewW, gap, flex);
+  const f = bestGrid(w, h, previewW, gap, flex, aspect);
   return gridRects(f, gap, f.cols * f.rows, x, y);
 }
 
 export function arrange(a: ArrangeInput): Arrangement {
   const { w, h, gap } = a;
   const flex = a.flex ?? FLEX;
+  const aspect = a.aspect ?? CELL_ASPECT;
+  const pinAspect = a.pinAspect ?? CELL_ASPECT;
   if (w <= 0 || h <= 0) return { rects: [], capacity: 0, kind: "grid" };
   // Never let a preview be wider than the stage allows for at least one tile.
-  const p = Math.max(40, Math.min(a.previewW, w - gap * 2, (h - gap * 2) * CELL_ASPECT));
+  const p = Math.max(40, Math.min(a.previewW, w - gap * 2, (h - gap * 2) * aspect));
 
   if (a.solo) {
-    const f = fitWall(w, h, 1, 1, 0);
+    // The full picture at the feed's own shape, so it is never letterboxed inside its frame.
+    const f = fitWall(w, h, 1, 1, 0, pinAspect);
     return { rects: [{ x: f.x, y: f.y, w: f.cellW, h: f.cellH }], capacity: 1, kind: "solo" };
   }
 
   if (!a.pinned) {
-    const g = bestGrid(w, h, p, gap, flex);
+    const g = bestGrid(w, h, p, gap, flex, aspect);
     const capacity = g.cols * g.rows;
     if (a.count !== undefined && a.count > 0 && a.count < capacity) {
-      const f = countGrid(w, h, a.count, g.cols, gap, flex);
+      const f = countGrid(w, h, a.count, g.cols, gap, flex, aspect);
       return { rects: gridRects(f, gap, a.count), capacity, kind: "grid" };
     }
     return { rects: gridRects(g, gap, capacity), capacity, kind: "grid" };
   }
 
-  if (a.pinMode === "wide") return wideLayout(w, h, p, gap, flex);
+  if (a.pinMode === "wide") return wideLayout(w, h, p, gap, flex, aspect, pinAspect);
 
   // Side: one regular grid of equal previews; the pinned video covers a span×span block of cells top-left, so the
   // column beside it and the row below are the same size and aligned.
   let q = p;
-  let g = bestGrid(w, h, q, gap, flex);
+  let g = bestGrid(w, h, q, gap, flex, aspect);
   // Too few cells for a block plus previews: shrink the previews until it works.
   while (Math.min(g.cols, g.rows) < 3 && q > 48) {
     q *= 0.9;
-    g = bestGrid(w, h, q, gap, flex);
+    g = bestGrid(w, h, q, gap, flex, aspect);
   }
   const span = Math.max(1, Math.min(g.cols - 1, g.rows - 1));
   const cell = (c: number, r: number, n = 1): Rect => ({
@@ -171,28 +178,42 @@ export function arrange(a: ArrangeInput): Arrangement {
 }
 
 /**
- * Wide: the pinned tile always spans the full width, with previews only in rows below it (never beside it).
- * On tall stages it is a full-width 4:3 and the leftover height becomes as many preview rows as fit (cells flex to
- * use the height exactly); on wide stages it keeps one preview row and the picture letterboxes inside the tile.
+ * Wide: the pinned video as big as fits at its own shape, previews in the rest.
+ * - Tall / square stages: the picture spans the full width (height = width ÷ its shape, at most 60% of the stage),
+ *   previews fill the rows below and flex to use the height exactly — no dead strip.
+ * - Short, wide stages (landscape phones, wide monitors): the picture fills the height on the left and the previews
+ *   fill the column(s) on its right, instead of a thin full-width strip.
  */
-function wideLayout(w: number, h: number, p: number, gap: number, flex: number): Arrangement {
-  const cols = Math.max(1, Math.floor((w - gap) / (p + gap)));
-  const cellW = (w - gap * (cols + 1)) / cols;
-  let cellH = cellW / CELL_ASPECT;
+function wideLayout(w: number, h: number, p: number, gap: number, flex: number, aspect: number, pinAspect: number): Arrangement {
   const fullW = w - gap * 2;
-  const maxBigH = fullW / CELL_ASPECT; // never taller than a full-width 4:3 picture
-  // At least one preview row; on tall stages, as many rows as fit under a full-width 4:3 picture.
-  let rows = Math.max(1, Math.floor((h - gap * 2 - Math.min(maxBigH, h * 0.6)) / (cellH + gap)));
-  while (rows > 1 && h - gap * 2 - rows * (cellH + gap) < Math.min(maxBigH, h * 0.4)) rows--;
-  let bigH = Math.max(40, Math.min(maxBigH, h - gap * 2 - rows * (cellH + gap)));
-  // Any height left over (the pinned tile already at full-width 4:3): let the preview rows absorb it within flex.
-  const spare = h - gap * 2 - bigH - rows * (cellH + gap);
-  if (spare > 0) cellH = Math.min(cellW / (CELL_ASPECT * (1 - flex)), cellH + spare / rows);
-  bigH = Math.max(40, Math.min(maxBigH, h - gap * 2 - rows * (cellH + gap)));
-  const rects: Rect[] = [{ x: gap, y: gap, w: fullW, h: bigH }];
-  const top = gap + bigH + gap;
-  for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; c++) rects.push({ x: gap + c * (cellW + gap), y: top + r * (cellH + gap), w: cellW, h: cellH });
+  const fullH = h - gap * 2;
+  const minPrevH = (p / aspect) * 0.8;
+  // Picture-left when a full-width picture would leave less than one decent preview row, or the stage is very wide.
+  const besideW = Math.min(fullH * pinAspect, w * 0.72);
+  const tooShort = h - gap * 3 - Math.min(fullW / pinAspect, h * 0.6) < minPrevH;
+  if ((w / h > 1.5 || tooShort) && w - besideW - gap * 3 >= Math.min(p, w * 0.22)) {
+    const bigW = besideW;
+    const rx = gap + bigW;
+    const rest = fillBox(rx, 0, w - rx, h, p, gap, flex, aspect);
+    const rects: Rect[] = [{ x: gap, y: gap, w: bigW, h: fullH }, ...rest];
+    return { rects, capacity: rects.length, kind: "wide" };
+  }
+  let bigH = Math.min(fullW / pinAspect, h * 0.6);
+  // Always leave at least one preview row.
+  bigH = Math.max(40, Math.min(bigH, h - gap * 3 - minPrevH));
+  const top = gap + bigH;
+  const rest = fillBox(0, top, w, h - top, p, gap, flex, aspect);
+  // The previews' grid may be centred with spare height; give it back to the picture (up to its natural height).
+  const usedBottom = rest.length ? Math.max(...rest.map((r) => r.y + r.h)) + gap : h;
+  const firstTop = rest.length ? Math.min(...rest.map((r) => r.y)) : h;
+  const spare = Math.max(0, h - usedBottom) + Math.max(0, firstTop - top - gap);
+  const grow = Math.min(spare, fullW / pinAspect - bigH);
+  if (grow > 1) {
+    bigH += grow;
+    const shift = top + gap + grow - firstTop;
+    for (const r of rest) r.y += shift;
+  }
+  const rects: Rect[] = [{ x: gap, y: gap, w: fullW, h: bigH }, ...rest];
   return { rects, capacity: rects.length, kind: "wide" };
 }
 

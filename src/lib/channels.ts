@@ -264,3 +264,8 @@ export function youtubeEmbed(id: string, muted: boolean): string {
 }
 
 export const fmtNum = (n: number) => String(n).padStart(4, "0");
+
+/** Picture shape of a feed: TD snapshots are 4:3 (320×240); HKO photos (720×405) and YouTube are 16:9. */
+export function feedAspect(ch: Channel | undefined): number {
+  return !ch || ch.kind === "td" ? 4 / 3 : 16 / 9;
+}

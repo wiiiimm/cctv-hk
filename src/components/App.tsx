@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** How long the CRT stays mounted after switch-off so the collapse-to-dot can play. */
 const CRT_OFF_MS = 950;
@@ -9,6 +9,7 @@ import { Sidebar } from "./deck/Sidebar";
 import { StatusBar } from "./deck/StatusBar";
 import { MobileBar } from "./deck/MobileBar";
 import { useMedia } from "../hooks/useMedia";
+import { useWallGestures } from "../hooks/useWallGestures";
 import { VideoWall } from "./monitor/VideoWall";
 import { CrtScreen } from "./crt/CrtScreen";
 
@@ -30,9 +31,37 @@ export default function App() {
   }, [narrowNow]);
   useEffect(() => {
     const onToggle = () => toggleSidebar();
+    // Open (never close): long-press and the phone bar's ⓘ want the camera details showing.
+    const onOpen = () => (window.innerWidth <= 1180 ? setGuideOpen(true) : theater && actions.toggleTheater());
     window.addEventListener("cctv:toggle-sidebar", onToggle);
-    return () => window.removeEventListener("cctv:toggle-sidebar", onToggle);
+    window.addEventListener("cctv:open-sidebar", onOpen);
+    return () => {
+      window.removeEventListener("cctv:toggle-sidebar", onToggle);
+      window.removeEventListener("cctv:open-sidebar", onOpen);
+    };
   });
+  const stageRef = useRef<HTMLElement>(null);
+  useWallGestures(stageRef);
+  // Landscape phone, full view: the bars hide after 3s for an edge-to-edge picture; a touch brings them back.
+  const focused = useStore((s) => s.focused);
+  const shortScreen = useMedia("(max-height: 500px)");
+  const [chromeHidden, setChromeHidden] = useState(false);
+  useEffect(() => {
+    if (!(focused && shortScreen)) return setChromeHidden(false);
+    let timer = setTimeout(() => setChromeHidden(true), 3000);
+    const wake = () => {
+      setChromeHidden(false);
+      clearTimeout(timer);
+      timer = setTimeout(() => setChromeHidden(true), 3000);
+    };
+    window.addEventListener("pointerdown", wake);
+    window.addEventListener("keydown", wake);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("pointerdown", wake);
+      window.removeEventListener("keydown", wake);
+    };
+  }, [focused, shortScreen]);
   // Esc closes the drawer first (before Esc's usual unpin / deselect).
   useEffect(() => {
     if (!guideOpen) return;
@@ -63,14 +92,14 @@ export default function App() {
   }, [lang]);
 
   return (
-    <div className={`app mode-${mode} lang-${lang}${theater ? " theater" : ""}${guideOpen ? " guide-open" : ""}`}>
+    <div className={`app mode-${mode} lang-${lang}${theater ? " theater" : ""}${guideOpen ? " guide-open" : ""}${chromeHidden ? " chrome-hidden" : ""}`}>
       <TopBar onGuide={toggleSidebar} sidebarShown={sidebarShown} />
       <div className="body">
         <Sidebar onPick={() => setGuideOpen(false)} onClose={toggleSidebar} />
         {/* Drawer mode only (hidden on wide screens): click outside the drawer to close it. */}
         {guideOpen && <div className="drawer-backdrop" onClick={() => setGuideOpen(false)} aria-hidden />}
         {/* CRT is a picture mode of the same viewer, not a separate screen. */}
-        <main className="stage">
+        <main className="stage" ref={stageRef}>
           {mode === "crt" || crtExit ? <CrtScreen exiting={mode !== "crt"} /> : <VideoWall />}
         </main>
       </div>
