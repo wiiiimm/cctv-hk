@@ -365,14 +365,18 @@ export const actions = {
     const i = order.indexOf(s.groupId);
     actions.loadGroup(order[(i + dir + order.length) % order.length]);
   },
+  /**
+   * Switch camera group without changing the layout: preview size, pin mode, pinned / full view all stay. With a video
+   * pinned (or in full view), the pinned slot switches to the group's first channel and the previews fill with the rest.
+   */
   loadGroup(groupId: string) {
     update((s) => {
       const keys = groupKeys({ ...s, groupId });
-      const pinnedKey = s.pinned ? s.cells[0] : undefined;
       const n = capacityOr(s.cells.length);
-      if (pinnedKey && keys.includes(pinnedKey)) {
-        const previews = pageCells(keys.filter((k) => k !== pinnedKey), 0, Math.max(1, n - 1));
-        return { groupId, page: 0, cells: [pinnedKey, ...previews], selected: 0, switchedAt: Date.now(), switchedCell: -1 };
+      if (s.pinned && keys.length) {
+        const [first, ...rest] = keys;
+        const previews = pageCells(rest, 0, Math.max(1, n - 1));
+        return { groupId, page: 0, cells: [first, ...previews], pinFrom: 0, selected: 0, switchedAt: Date.now(), switchedCell: -1 };
       }
       return {
         groupId,

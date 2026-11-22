@@ -32,8 +32,9 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   clicking a small tile while pinned pins it instead; unpinning returns the video to its original cell (`pinFrom`).
   **Requirement:** a preview is never as large as the pinned video — `arrange` checks every pinned layout (each
   preview ≤ half the pinned width and shorter) and shrinks previews until it holds; "side" needs at least a 2×2 block.
-  Switching camera group keeps the pin only if the pinned channel is in the new group; otherwise the pin is released
-  (same rule when restoring saved state). The wall never shows a channel twice.
+  Switching camera group never changes the layout: with something pinned (or in full view), the pinned slot switches to
+  the new group's first channel and the previews fill with the rest. (Restoring saved state still releases a saved pin
+  that isn't in the saved group.) The wall never shows a channel twice.
 - Phones / small tablets: below 1100px the top bar is one row (☰, brand, PATROL, CRT, ⋯ sheet with the rest);
   below 760px `MobileBar` replaces the status bar (camera actions or group + pager); no bottom bar under 500px
   high. Preview badges become dots below 760px (not on the pinned / full tile). CRT curvature is 60% of the preset on desktop, 30% on phones

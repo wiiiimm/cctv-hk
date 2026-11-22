@@ -576,12 +576,9 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 
 /* Autoplaying previews at reduced quality: YouTube picks the stream quality from the player's size (sites can no
    longer request one), so a preview's player is laid out at half size and scaled up — a lighter, lower-res stream. */
-/* As little YouTube chrome as possible: the player is laid out taller than its tile, so the video letterboxes with bars
-   exactly where YouTube draws its title bar (top) and logo / "more videos" strip (bottom) — and those bars sit outside
-   the tile (overflow hidden). --yt-bar is in player pixels. */
-.tile iframe.tile-media, .crt-video iframe { --yt-bar: 60px; position: absolute; inset: auto; left: 0; top: calc(-1 * var(--yt-bar)); width: 100%; height: calc(100% + 2 * var(--yt-bar)); }
-/* Reduced-quality previews: a half-size player scaled ×2 (so the bars are half as many layout pixels). */
-.tile iframe.tile-media.lowq, .crt-video.lowq iframe { --yt-bar: 48px; top: 0; width: 50%; height: calc(50% + 2 * var(--yt-bar)); transform: scale(2) translateY(calc(-1 * var(--yt-bar))); transform-origin: 0 0; }
+/* Reduced-quality previews: YouTube picks the quality from the player's size, so the player is laid out at half size
+   and scaled ×2 (the picture itself isn't cropped). */
+.tile iframe.tile-media.lowq, .crt-video.lowq iframe { width: 50%; height: 50%; transform: scale(2); transform-origin: 0 0; }
 
 /* Map inset on the pinned / full-view tile (normal wall, sidebar hidden): like the CRT inset. Click folds it to 80px. */
 .tile-map { position: absolute; z-index: 3; left: 8px; top: 34px; width: clamp(120px, 18%, 260px); aspect-ratio: 3 / 2; overflow: hidden; background: #0b0d10; border: 2px solid rgba(255, 255, 255, 0.8); opacity: 0.8; cursor: pointer; transition: width 0.2s ease, opacity 0.15s; }
