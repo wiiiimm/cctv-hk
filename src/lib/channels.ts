@@ -421,14 +421,6 @@ function buildGroups(): ChannelGroup[] {
       labelZh: r.group!.labelZh,
       keys: CHANNELS.filter((c) => c.code.startsWith(`rec-${r.slug}-`)).map((c) => c.key),
     })),
-    // Horse racing (bank 4xx too, but not news): its own group, listed with the topics.
-    {
-      id: "racing",
-      section: "topic",
-      label: "Horse racing",
-      labelZh: "賽馬",
-      keys: NEWS_STREAMS.filter((s) => s.racing).sort((a, b) => a.num - b.num).map((s) => `yt:${s.id}`),
-    },
     { id: "kind:hko", section: "type", label: "Hong Kong weather", labelZh: "香港天氣", keys: keysOf(CHANNELS.filter((c) => c.kind === "hko")) },
     { id: "kind:td", section: "type", label: "Traffic", labelZh: "交通", keys: keysOf(CHANNELS.filter((c) => c.kind === "td")) },
   ];
@@ -437,6 +429,14 @@ function buildGroups(): ChannelGroup[] {
     const keys = [...new Set([...t.keys.filter((k) => CHANNEL_BY_KEY.has(k)), ...matched])];
     if (keys.length) groups.push({ id: `topic:${t.id}`, section: "topic", label: t.label, labelZh: t.labelZh, keys });
   }
+  // Horse racing (bank 4xx too, but not news): its own group, last of the topics.
+  groups.push({
+    id: "racing",
+    section: "topic",
+    label: "Horse racing",
+    labelZh: "賽馬",
+    keys: NEWS_STREAMS.filter((s) => s.racing).sort((a, b) => a.num - b.num).map((s) => `yt:${s.id}`),
+  });
   // Location groups hold every located feed (traffic, weather and live) in that region / district.
   for (const region of REGION_ORDER) {
     const inRegion = CHANNELS.filter((c) => c.region === region);
