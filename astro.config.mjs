@@ -4,8 +4,8 @@ import react from "@astrojs/react";
 import vercel from "@astrojs/vercel";
 
 export default defineConfig({
-  // Public address: makes canonical / og:url / og:image / sitemap absolute.
-  site: globalThis.process?.env.SITE_URL || "https://hk-monitor.wiiiimm.codes",
+  // Public address: makes canonical / og:url / og:image / sitemap URLs absolute.
+  site: "https://hk-monitor.wiiiimm.codes",
   integrations: [react()],
   adapter: vercel({
     webAnalytics: { enabled: true },
