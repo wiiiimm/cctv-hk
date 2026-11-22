@@ -3,13 +3,15 @@ import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed } from "../../lib/channels";
 import { getSnap, retain, useSnap } from "../../lib/snapshots";
 import { lastTouchAt } from "../../hooks/useWallGestures";
 import { CRT_NEWS_H, useNews, type NewsItem } from "../../lib/news";
+import { NewsTicker } from "../deck/NewsTicker";
+import { flatCells, tickerCurves } from "../../lib/crt/flat";
 import { actions, bigAspect, feedCount, store, useStore, wallAspect } from "../../lib/store";
 import { drawScreen } from "../../lib/crt/compositor";
 import { arrange, publishGeometry, type PinMode, type Rect } from "../../lib/arrange";
 import { CrtRenderer, ON, powerOff, powerOn, unwarp } from "../../lib/crt/renderer";
-import { crtCurvature, crtInset, presetById, videoFilter, type CrtPreset } from "../../lib/crt/presets";
+import { crtCurvature, crtInset, presetById, setCrtCurve, videoFilter, type CrtPreset } from "../../lib/crt/presets";
 import "./crt-video.css";
-import { chName, useT } from "../../lib/i18n";
+import { chName } from "../../lib/i18n";
 import { powerThunk, staticBurst } from "../../lib/audio";
 import { PinControls } from "../monitor/PinControls";
 import { useYouTubeErrors } from "../../hooks/useYouTubeErrors";
@@ -39,7 +41,6 @@ function CrtYouTube({ chKey, rect, muted, big, preset, switchedAt }: { chKey: st
   const ch = CHANNEL_BY_KEY.get(chKey);
   const snap = useSnap(ch, big);
   const lang = useStore((s) => s.lang);
-  const t = useT();
   const frameRef = useRef<HTMLIFrameElement>(null);
   useYouTubeErrors(frameRef, chKey, !!ch && ch.kind === "yt" && !!snap.live);
   const [burst, setBurst] = useState(false);
@@ -63,12 +64,7 @@ function CrtYouTube({ chKey, rect, muted, big, preset, switchedAt }: { chKey: st
       {preset.sweep > 0 && <div className="cv-layer cv-sweep" />}
       <div className="cv-layer cv-vignette" />
       {burst && <div className="cv-layer cv-static" />}
-      <div className="crt-video-osd">
-        <span>
-          CH {fmtNum(ch.num)} {t.stLive}
-        </span>
-        {big && <span>{chName(ch, lang)}</span>}
-      </div>
+      {/* Labels / badge / stamp for this tile are drawn on the flat overlay canvas above the players. */}
     </div>
   );
 }
@@ -77,11 +73,12 @@ function CrtYouTube({ chKey, rect, muted, big, preset, switchedAt }: { chKey: st
  * Cells that play a live YouTube player in CRT mode — every visible YouTube tile that is actually live. Off-air /
  * unavailable streams are left to the canvas, which draws the OFF AIR screen like any other dead feed.
  */
-function videoCells(s: { cells: string[]; pinned: boolean; focused: boolean; selected: number }, shown: number): number[] {
+function videoCells(s: { cells: string[]; pinned: boolean; focused: boolean; selected: number; autoplay: boolean }, shown: number): number[] {
   const isLiveYt = (key: string) => CHANNEL_BY_KEY.get(key)?.kind === "yt" && !!getSnap(key).live;
   if (s.focused) return isLiveYt(s.cells[s.selected]) ? [s.selected] : [];
   const out: number[] = [];
-  for (let i = 0; i < Math.min(shown, s.cells.length); i++) if (isLiveYt(s.cells[i])) out.push(i);
+  // The pinned video always plays; previews only with AUTOPLAY on (else the canvas draws their still).
+  for (let i = 0; i < Math.min(shown, s.cells.length); i++) if (isLiveYt(s.cells[i]) && (s.autoplay || (s.pinned && i === 0))) out.push(i);
   return out;
 }
 
@@ -121,10 +118,12 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   exitingRef.current = exiting;
   const wrapRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const overHostRef = useRef<HTMLDivElement>(null);
   // Pointer over the tube: pinned / full-view buttons only show on hover (like the normal wall).
   const hoverRef = useRef(false);
-  // Latest news for the frame loop (null = ticker off).
+  // Latest news for the frame loop (null = ticker off), and whether the ticker is the flat DOM one this frame.
   const newsRef = useRef<NewsItem[] | null>(null);
+  const flatRef = useRef(false);
   const [fallback, setFallback] = useState(false);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const cells = useStore((s) => s.cells);
@@ -156,6 +155,11 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
     const wrap = wrapRef.current!;
     const src = document.createElement("canvas");
     const ctx = src.getContext("2d")!;
+    // Flat OSD layer above the YouTube players (their labels / badges / pin buttons would be hidden under them).
+    const ov = document.createElement("canvas");
+    ov.className = "crt-overlay";
+    const octx = ov.getContext("2d")!;
+    overHostRef.current!.appendChild(ov);
     // Try WebGL on a fresh canvas; if the shader can't run, show the flat composited picture instead.
     const out = document.createElement("canvas");
     out.className = "crt-canvas";
@@ -177,6 +181,8 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
       const scale = Math.min(1.5, dpr);
       src.width = Math.max(2, Math.round(r.width * scale));
       src.height = Math.max(2, Math.round(r.height * scale));
+      ov.width = src.width;
+      ov.height = src.height;
       setSize({ w: r.width, h: r.height });
     };
     const ro = new ResizeObserver(resize);
@@ -250,17 +256,20 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
           patrol: s.patrol,
           // Tiles that play a real YouTube player on top are left blank on the canvas.
           videoCells: videoCells(s, Number.MAX_SAFE_INTEGER),
+          flatCells: flatCells(s, Number.MAX_SAFE_INTEGER),
           pinUi: pinButtons(s, hoverRef.current),
           lang: s.lang,
           inset: crtInset(crtCurvature(preset)),
           count: feedCount(s),
           news: newsRef.current,
+          flatTicker: flatRef.current,
           newsH: CRT_NEWS_H,
           aspect: wallAspect(s),
           pinAspect: bigAspect(s),
           scale: src.width / Math.max(1, wrap.clientWidth),
         },
         now,
+        octx,
       );
       const since = now - s.switchedAt;
       let staticAmt = since < 260 ? 0.85 * (1 - since / 260) : 0;
@@ -307,12 +316,22 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   // Pin controls float over the selected tile (PIN) or the pinned video (SOLO / UNPIN), matching the CRT geometry.
   const count = useStore(feedCount);
   const newsOn = useStore((s) => s.news);
+  const autoplay = useStore((s) => s.autoplay);
+  // CURVE toggle: set before anything below asks for the curvature (layout, inset, click mapping, frame loop).
+  const curveOn = useStore((s) => s.crtCurve);
+  setCrtCurve(curveOn);
+  const tubeInset = crtInset(crtCurvature(presetById(preset)));
   const news = useNews(newsOn ? lang : null);
   newsRef.current = newsOn ? (news ?? []) : null;
   const aspect = useStore(wallAspect);
   const pinAspect = useStore(bigAspect);
   const crt = size.w > 0 ? crtLayout(size.w, size.h, { ...pin, crtPreset: preset, count, aspect, pinAspect, news: newsOn }) : { rects: [] as Rect[], capacity: 0 };
   const rects = crt.rects;
+  // One rule for the ticker (lib/crt/flat.ts): it curves unless a flat (YouTube) tile sits in the top row.
+  const flat = flatCells({ cells, focused: pin.focused, selected }, rects.length);
+  // With CURVE off nothing is warped, so the ticker always goes through the shader (no mismatch possible).
+  const flatTicker = newsOn && curveOn && !tickerCurves(flat, (i) => (pin.focused ? rects[0] : rects[i]), size.h * tubeInset + CRT_NEWS_H);
+  flatRef.current = flatTicker;
   let controls: { role: "selected" | "pinned" | "solo"; index: number; x: number; y: number; w: number; h: number } | null = null;
   if (rects.length && (selected >= 0 || pin.pinned)) {
     const onPinned = pin.focused || (pin.pinned && selected <= 0);
@@ -349,7 +368,7 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
       onMouseLeave={() => (hoverRef.current = false)}
     >
       <div ref={hostRef} className="crt-host" role="img" aria-label={activeCh ? `CH ${fmtNum(activeCh.num)} ${chName(activeCh, lang)}` : "CRT"} />
-      {videoCells({ cells, pinned: pin.pinned, focused: pin.focused, selected }, rects.length).map((i) => {
+      {videoCells({ cells, pinned: pin.pinned, focused: pin.focused, selected, autoplay }, rects.length).map((i) => {
         const rect = pin.focused ? rects[0] : rects[i];
         if (!rect) return null;
         const big = pin.focused || (pin.pinned && i === 0);
@@ -358,6 +377,13 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
           <CrtYouTube key={`${cells[i]}-${i}`} chKey={cells[i]} rect={rect} big={big} muted={muted || !big} preset={presetById(preset)} switchedAt={hit ? switchedAt : 0} />
         );
       })}
+      <div ref={overHostRef} className="crt-overlay-host" aria-hidden />
+      {flatTicker && size.w > 0 && (
+        <NewsTicker
+          crt
+          style={{ left: size.w * tubeInset, top: size.h * tubeInset, width: size.w * (1 - 2 * tubeInset), height: CRT_NEWS_H - 3 }}
+        />
+      )}
       <div className="crt-glass" />
       {controls && (
         <div

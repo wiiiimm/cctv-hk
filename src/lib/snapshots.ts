@@ -94,7 +94,8 @@ async function load(key: string) {
   try {
     if (ch.kind === "yt") {
       // Off air = not broadcasting (no live thumbnail), or YouTube won't play it here ("Video unavailable").
-      const [onAir, canEmbed] = await Promise.all([probeLive(ch.code), embeddable(ch.code), e.snap.url ? Promise.resolve() : fetchInto(key, src!)]);
+      // The still is refreshed on every check: previews show it when AUTOPLAY is off.
+      const [onAir, canEmbed] = await Promise.all([probeLive(ch.code), embeddable(ch.code), fetchInto(key, e.snap.url ? bust(src!) : src!).catch(() => {})]);
       const blocked = (unavailableUntil.get(key) ?? 0) > Date.now();
       const live = onAir && canEmbed && !blocked;
       set(key, { live, status: live ? "ok" : "offline" });

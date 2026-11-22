@@ -6,7 +6,7 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
 ## Architecture
 
 - `src/lib/store.ts` — the single viewing engine (layout n×m, cells, selection, focus, patrol, mode). Both UIs drive it.
-- `src/lib/channels.ts` — every feed as a numbered `Channel`: 1xx YouTube live, 2xx HKO weather, 1001+ TD traffic.
+- `src/lib/channels.ts` — every feed as a numbered `Channel`: 1xx HK YouTube live, 2xx HKO weather, 3xx world YouTube live ("World live" group), 4xx 24/7 news & finance, 5xx space ("Space" group) ("News & finance" picker section: by language, Taiwan, Asia-Pacific, international, finance), 1001+ TD traffic. Stream numbers are fixed in `data/streams.ts`.
 - `src/lib/snapshots.ts` — one poller per visible feed; fetches blobs so the DOM gets object URLs and the CRT gets ImageBitmaps (no tainted canvas).
 - Console mode: `components/monitor/*` (DOM wall) + `components/deck/*` (guide, focus panel with mini-map).
 - CRT is a picture mode of the same viewer (no device shell): `components/crt/CrtScreen.tsx` replaces the DOM wall in the stage.
@@ -61,7 +61,14 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
 - News ticker: `src/pages/api/news.ts` relays fixed upstreams only (HKO warnsum JSON, TD special traffic news XML,
   RTHK local RSS — RTHK has no CORS) as one JSON list per language; `lib/news.ts` polls it (3 min) for both views.
   The DOM ticker (`components/deck/NewsTicker.tsx`) sits at the top of the viewer column (never over the sidebar);
-  in CRT mode it is drawn inside the tube by the compositor (`drawTicker`) and `crtLayout` reserves `CRT_NEWS_H`.
+  in CRT mode `crtLayout` / the compositor reserve `CRT_NEWS_H` for it. Flat vs curved is decided in one place,
+  `lib/crt/flat.ts`: every YouTube tile (live or off air) is flat — players can't be warped — and is drawn, with its
+  OSD, on a flat overlay canvas above the players (`drawScreen(..., over)`); the ticker curves (shader) unless a
+  YouTube tile is in the top row, then it is a flat DOM strip (`tickerCurves`).
+- AUTOPLAY toggle (`autoplay`, URL `autoplay=0`): off = YouTube previews show a still (refreshed each liveness
+  check) with ▶; the pinned / full-view video always plays (DOM `allowVideo`, CRT `videoCells`).
+- CURVE toggle (`crtCurve`, URL `curve=0`): off = every CRT effect but no barrel distortion; `crtCurvature()` returns 0
+  (set via `setCrtCurve`, kept in step by CrtScreen), and the ticker always goes through the shader.
   Toggle: NEWS (`news`, URL `news=0`).
 - Maps fly between locations (`flyView` / `tilesForView` in `lib/maptiles.ts`, used by `MiniMap` and the CRT map
   inset): pan for short hops, zoom out–pan–in for long ones; the pin rides with the map.

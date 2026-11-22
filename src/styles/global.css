@@ -318,6 +318,10 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .guide-row .sub { color: var(--dim); font-size: var(--fs-sm); }
 .fav { flex: none; width: 34px; height: 34px; background: none; border: 0; border-radius: var(--r); color: var(--line-3); font-size: 13px; transition: color var(--ease); }
 .fav.on, .fav:hover { color: var(--sel); }
+/* Add-to-group beside the star: same quiet button, a group icon; yellow when the camera is in any of my groups. */
+.fav.grp { width: 28px; display: inline-grid; place-items: center; }
+.fav.grp svg { width: 14px; height: 14px; }
+.fav.grp.open { color: var(--text); }
 .fav:focus-visible { outline-offset: -4px; }
 .empty { padding: 20px var(--sp-3); color: var(--dim); }
 
@@ -434,6 +438,9 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .crt-glass { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 60% 40% at 28% 15%, rgba(255, 255, 255, 0.05), transparent 60%); }
 .crt-video { position: absolute; border-radius: 3% / 4%; overflow: hidden; background: #000; }
 .crt-video iframe { width: 100%; height: 100%; border: 0; }
+/* Flat OSD layer over the YouTube players (above them, under the pin hit targets and the flat ticker). */
+.crt-overlay-host { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.crt-overlay { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .crt-video-osd { position: absolute; left: 4%; bottom: 14%; display: grid; gap: 2px; font: 17px / 1.1 var(--osd); color: #7cff6b; text-shadow: 2px 2px 0 #000; pointer-events: none; }
 
 /* ---------- responsive ---------- */
@@ -493,3 +500,37 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 }
 @media (max-height: 500px) { .news-ticker { display: none; } }
 .app.chrome-hidden .news-ticker { display: none; }
+
+/* CRT mode: the ticker is a flat strip across the top of the tube (YouTube can't be warped, so neither is this —
+   their edges line up), styled like the tube's OSD: pixel font, scanlines, a little glow and colour fringe. */
+.news-ticker.crt { position: absolute; z-index: 3; border: 0; background: rgba(0, 0, 0, 0.92); font: 15px/1 var(--osd); border-radius: 3px; overflow: hidden;
+  text-shadow: 1px 0 rgba(255, 40, 40, 0.35), -1px 0 rgba(40, 120, 255, 0.35), 0 0 6px rgba(255, 255, 255, 0.25); }
+.news-ticker.crt .nt-label { font: 15px/1 var(--osd); display: grid; place-items: center; background: #d71f1f; letter-spacing: 0.04em; }
+.news-ticker.crt .nt-viewport { display: flex; align-items: center; }
+.news-ticker.crt .nt-time, .news-ticker.crt .nt-tag { font: 14px/1 var(--osd); }
+.news-ticker.crt .nt-tag { padding: 1px 4px; }
+.news-ticker.crt::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0 1px, transparent 1px 3px); }
+
+/* A control that only applies in another mode (e.g. CURVE outside CRT): shown, but quieter. */
+.pill.dim { opacity: 0.55; }
+
+/* English ticker text runs larger (normal view and the flat CRT strip; Chinese is already dense enough). */
+.lang-en .news-ticker:not(.crt) .nt-text { font-size: 14px; }
+.lang-en .news-ticker:not(.crt) { height: 28px; line-height: 28px; }
+.lang-en .news-ticker:not(.crt) .nt-label { line-height: 28px; }
+.lang-en .news-ticker.crt .nt-label { font-size: 18px; }
+.lang-en .news-ticker.crt { font-size: 20px; }
+.lang-en .news-ticker.crt .nt-time, .lang-en .news-ticker.crt .nt-tag { font-size: 17px; }
+/* Chinese runs smaller (dense glyphs read fine at a smaller size). */
+.lang-zh .news-ticker:not(.crt) .nt-text { font-size: 11px; }
+.lang-zh .news-ticker:not(.crt) { height: 24px; line-height: 24px; }
+.lang-zh .news-ticker:not(.crt) .nt-label { line-height: 24px; font-size: 10px; }
+.lang-zh .news-ticker.crt { font-size: 13px; }
+.lang-zh .news-ticker.crt .nt-label { font-size: 13px; }
+
+/* Narrow phones: tighter pills so ☰, brand, PATROL, CRT, 中文/EN and ⋯ fit on one row. */
+@media (max-width: 420px) {
+  .topbar.compact .tb-compact-end .pill { padding: 0 8px; letter-spacing: 0.04em; }
+  .topbar.compact .tb-compact-end { gap: 3px; }
+  .topbar.compact { gap: var(--sp-2); padding-left: 8px; padding-right: 8px; }
+}

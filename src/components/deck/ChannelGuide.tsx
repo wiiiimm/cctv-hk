@@ -3,6 +3,7 @@ import { CHANNELS, CHANNEL_BY_KEY, GROUPS, fmtNum } from "../../lib/channels";
 import { fuzzySearch } from "../../lib/search";
 import { actionTarget, actions, groupKeysOf, store, useStore } from "../../lib/store";
 import { chAltName, chDistrict, chName, groupLabel, useT } from "../../lib/i18n";
+import { GroupMenu } from "./GroupMenu";
 import { GroupMap } from "./GroupMap";
 import type { Lang } from "../../lib/store";
 
@@ -80,6 +81,7 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
               </optgroup>
               <optgroup label={t.topics}>{section("topic").map((g) => opt(g))}</optgroup>
               <optgroup label={t.feedTypes}>{section("type").map((g) => opt(g))}</optgroup>
+              <optgroup label={t.newsGroups}>{section("news").map((g) => opt(g))}</optgroup>
               <optgroup label={t.regions}>
                 {GROUPS.filter((g) => g.section === "region" || g.section === "district").map((g) => opt(g, g.section === "district"))}
               </optgroup>
@@ -168,6 +170,8 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
                   </span>
                 </span>
               </button>
+              {/* Add to my groups, then favourite. */}
+              <GroupMenu chKey={c.key} compact />
               <button type="button" className={`fav${fav ? " on" : ""}`} onClick={() => actions.toggleFavourite(c.key)} aria-label={fav ? t.removeFav : t.addFav}>
                 ★
               </button>

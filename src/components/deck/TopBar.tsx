@@ -94,6 +94,27 @@ function PictureMode() {
   );
 }
 
+function CurveToggle() {
+  const t = useT();
+  const curve = useStore((s) => s.crtCurve);
+  const crtOn = useStore((s) => s.mode === "crt");
+  return (
+    <button type="button" className={`pill toggle${curve ? " on" : ""}${crtOn ? "" : " dim"}`} onClick={actions.toggleCurve} title={t.curveTitle} aria-pressed={curve}>
+      {t.curve}
+    </button>
+  );
+}
+
+function AutoplayToggle() {
+  const t = useT();
+  const autoplay = useStore((s) => s.autoplay);
+  return (
+    <button type="button" className={`pill toggle${autoplay ? " on" : ""}`} onClick={actions.toggleAutoplay} title={t.autoplayTitle} aria-pressed={autoplay}>
+      {t.autoplay}
+    </button>
+  );
+}
+
 function SoundToggle() {
   const t = useT();
   const muted = useStore((s) => s.muted);
@@ -128,17 +149,37 @@ function LangToggle() {
 function ShareButton() {
   const t = useT();
   const [done, setDone] = useState(false);
+  const copied = () => {
+    setDone(true);
+    setTimeout(() => setDone(false), 1600);
+  };
   const share = async () => {
     const url = viewLink(store.get());
-    try {
-      if (navigator.share && matchMedia("(hover: none)").matches) await navigator.share({ title: document.title, url });
-      else {
-        await navigator.clipboard.writeText(url);
-        setDone(true);
-        setTimeout(() => setDone(false), 1600);
+    // Touch devices: the system share sheet (HTTPS only). Elsewhere: copy the link.
+    if (navigator.share && window.isSecureContext && matchMedia("(hover: none)").matches) {
+      try {
+        await navigator.share({ title: document.title, url });
+        return;
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return; // user closed the sheet
       }
+    }
+    try {
+      if (!navigator.clipboard || !window.isSecureContext) throw new Error("no async clipboard");
+      await navigator.clipboard.writeText(url);
+      copied();
     } catch {
-      /* share cancelled */
+      // Plain-HTTP pages (e.g. the dev server over Tailscale) have no async clipboard: copy via a hidden text box.
+      const box = document.createElement("textarea");
+      box.value = url;
+      box.setAttribute("readonly", "");
+      box.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
+      document.body.appendChild(box);
+      box.select();
+      const ok = document.execCommand("copy");
+      box.remove();
+      if (ok) copied();
+      else window.prompt(t.shareView, url); // last resort: show it to copy by hand
     }
   };
   return (
@@ -197,13 +238,14 @@ function MorePanel({ onClose }: { onClose: () => void }) {
         <span className="tb-sheet-label">{t.pictureMode.replace(/\s*\(.*\)$/, "")}</span>
         <div className="tb-group">
           <PictureMode />
+          <CurveToggle />
         </div>
       </div>
       <div className="tb-sheet-row">
         <div className="tb-group">
           <SoundToggle />
+          <AutoplayToggle />
           <NewsToggle />
-          <LangToggle />
           <ShareButton />
         </div>
         <Clock />
@@ -243,6 +285,8 @@ export function TopBar({ onGuide, sidebarShown = true }: { onGuide: () => void; 
         <div className="tb-compact-end">
           <PatrolToggle />
           <CrtToggle />
+          {/* Language is always one tap away, even on the smallest screens. */}
+          <LangToggle />
           <button
             type="button"
             className={`icon-btn tb-more${more ? " on" : ""}`}
@@ -266,9 +310,11 @@ export function TopBar({ onGuide, sidebarShown = true }: { onGuide: () => void; 
           <div className="tb-group" role="group" aria-label={t.crtTitle}>
             <CrtToggle />
             <PictureMode />
+            <CurveToggle />
           </div>
           <div className="tb-group">
             <SoundToggle />
+            <AutoplayToggle />
             <NewsToggle />
             <LangToggle />
             <ShareButton />

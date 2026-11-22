@@ -5,8 +5,11 @@ import { useT } from "../../lib/i18n";
 import { IconButton } from "../PinButtons";
 import { GroupsIcon } from "../icons";
 
-/** "Add to my groups": tick the user's groups this camera belongs to, or start a new group with it. */
-export function GroupMenu({ chKey }: { chKey: string }) {
+/**
+ * "Add to my groups": tick the user's groups this camera belongs to, or start a new group with it.
+ * `compact`: the small borderless button used in channel-list rows (beside the ★).
+ */
+export function GroupMenu({ chKey, compact = false }: { chKey: string; compact?: boolean }) {
   const t = useT();
   const groups = useStore((s) => s.customGroups);
   const [open, setOpen] = useState(false);
@@ -54,7 +57,20 @@ export function GroupMenu({ chKey }: { chKey: string }) {
 
   return (
     <span className="group-menu-wrap" ref={ref}>
-      <IconButton icon={<GroupsIcon />} label={t.addToGroup} on={member > 0} onPress={() => setOpen((v) => !v)} />
+      {compact ? (
+        <button
+          type="button"
+          className={`fav grp${member > 0 ? " on" : ""}${open ? " open" : ""}`}
+          onClick={() => setOpen((v) => !v)}
+          title={t.addToGroup}
+          aria-label={t.addToGroup}
+          aria-expanded={open}
+        >
+          <GroupsIcon />
+        </button>
+      ) : (
+        <IconButton icon={<GroupsIcon />} label={t.addToGroup} on={member > 0} onPress={() => setOpen((v) => !v)} />
+      )}
       {open &&
         createPortal(
         <div

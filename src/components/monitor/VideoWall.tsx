@@ -11,7 +11,7 @@ export const WALL_GAP = 3;
  * with the pinned video (if any) shown large beside or above them. It reports its capacity back to the store.
  */
 export function VideoWall() {
-  const { cells, selected, focused, muted, pinned, previewSize, pinMode } = useStore((s) => s);
+  const { cells, selected, focused, muted, pinned, previewSize, pinMode, autoplay } = useStore((s) => s);
   const ref = useRef<HTMLDivElement>(null);
   const [area, setArea] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -63,8 +63,9 @@ export function VideoWall() {
                 // The pinned (big) video needs no selection highlight; previews still get one.
                 selected={!solo && i === selected && !big}
                 large={big}
-                // Live YouTube autoplays everywhere; previews are always muted, only the pinned / full video has sound.
-                allowVideo
+                // Live YouTube only (traffic / weather are unaffected): the pinned / full-view video always plays;
+                // previews play muted when AUTOPLAY is on, else show a still + ▶. Only the big video has sound.
+                allowVideo={big || autoplay}
                 muted={muted || !big}
               />
             </div>

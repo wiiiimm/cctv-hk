@@ -1,11 +1,11 @@
 import tdCameras from "../data/td-cameras.json";
 import { HKO_STATIONS } from "../data/hko-stations";
-import { LIVE_STREAMS } from "../data/streams";
+import { LIVE_STREAMS, NEWS_STREAMS, SPACE_STREAMS, WORLD_STREAMS } from "../data/streams";
 
 export type FeedKind = "td" | "hko" | "yt";
 
 export interface Channel {
-  /** Stable key, e.g. "td:H429F", "hko:HKO", "yt:jmwM1hA3JE0". */
+  /** Stable key, e.g. "td:H429F", "hko:HKO". */
   key: string;
   /** Channel number shown on the OSD, unique across all feeds. */
   num: number;
@@ -27,7 +27,7 @@ export interface ChannelGroup {
   label: string;
   labelZh: string;
   /** Where it is listed in the group picker. */
-  section: "type" | "topic" | "region" | "district" | "custom";
+  section: "type" | "topic" | "news" | "region" | "district" | "custom";
   keys: string[];
 }
 
@@ -35,11 +35,41 @@ const REGION_ORDER = ["Hong Kong Island", "Kowloon", "New Territories"];
 
 function build(): Channel[] {
   const out: Channel[] = [];
-  // Bank 1xx: live video. Bank 2xx: HKO weather. Bank 1000+: traffic, region then district.
-  LIVE_STREAMS.forEach((s, i) =>
+  // Bank 1xx: HK live video. 2xx: HKO weather. 3xx: world live video. 4xx: news & finance. 5xx: space. 1000+: traffic.
+  SPACE_STREAMS.forEach((s) =>
     out.push({
       key: `yt:${s.id}`,
-      num: 101 + i,
+      num: s.num,
+      kind: "yt",
+      code: s.id,
+      name: s.name,
+      nameZh: s.nameZh,
+      region: "Space",
+      regionZh: "太空",
+      district: s.place,
+      districtZh: s.placeZh,
+      refreshMs: 0,
+    }),
+  );
+  NEWS_STREAMS.forEach((s) =>
+    out.push({
+      key: `yt:${s.id}`,
+      num: s.num,
+      kind: "yt",
+      code: s.id,
+      name: s.name,
+      nameZh: s.nameZh,
+      region: "News",
+      regionZh: "新聞",
+      district: s.country,
+      districtZh: s.countryZh,
+      refreshMs: 0,
+    }),
+  );
+  LIVE_STREAMS.forEach((s) =>
+    out.push({
+      key: `yt:${s.id}`,
+      num: s.num,
       kind: "yt",
       code: s.id,
       name: s.name,
@@ -52,6 +82,22 @@ function build(): Channel[] {
       refreshMs: 0,
     }),
   );
+  WORLD_STREAMS.forEach((s) =>
+    out.push({
+      key: `yt:${s.id}`,
+      num: s.num,
+      kind: "yt",
+      code: s.id,
+      name: s.name,
+      nameZh: s.nameZh,
+      region: "World",
+      regionZh: "世界",
+      district: s.country,
+      districtZh: s.countryZh,
+      refreshMs: 0,
+    }),
+  );
+
   HKO_STATIONS.forEach((s, i) =>
     out.push({
       key: `hko:${s.code}`,
@@ -90,7 +136,8 @@ function build(): Channel[] {
       refreshMs: 2 * 60_000,
     }),
   );
-  return out;
+  // Channel-number order everywhere (1xx HK live, 2xx weather, 3xx world, then traffic).
+  return out.sort((a, b) => a.num - b.num);
 }
 
 /**
@@ -120,7 +167,7 @@ export const CHANNEL_BY_NUM = new Map(CHANNELS.map((c) => [c.num, c]));
 
 const FEATURED_HINTS = [
   "hko:HK2",
-  "yt:jmwM1hA3JE0",
+  "yt:Z8NTLkEFZjg",
   "hko:VPB",
   "td:Cross Harbour Tunnel",
   "td:Gloucester Road",
@@ -131,7 +178,7 @@ const FEATURED_HINTS = [
   "td:Lion Rock Tunnel",
   "hko:CWB",
   "td:Airport",
-  "yt:TIYZVyzOk4k",
+  "yt:XN-ArdUrqtc",
   "td:Western Harbour",
   "hko:LAM",
   "td:Tolo Highway",
@@ -174,14 +221,14 @@ const TOPICS: { id: string; label: string; labelZh: string; keys: string[]; matc
     id: "harbour",
     label: "Victoria Harbour",
     labelZh: "維多利亞港",
-    keys: ["hko:HK2", "hko:HKO", "hko:IC1", "hko:IC2", "hko:CP1", "hko:HMM", "hko:DNL", "hko:SWH", "yt:XN-ArdUrqtc", "yt:6YYmUo2TgJ0", "yt:jmwM1hA3JE0", "yt:Fwr8lBTaBtE"],
+    keys: ["hko:HK2", "hko:HKO", "hko:IC1", "hko:IC2", "hko:CP1", "hko:HMM", "hko:DNL", "hko:SWH", "yt:XN-ArdUrqtc", "yt:Z8NTLkEFZjg"],
     match: /Cross Harbour|Western Harbour|Eastern Harbour|Harbour Road|Gloucester Road|Connaught Road/,
   },
   {
     id: "peak",
     label: "Peak & skyline",
     labelZh: "山頂及天際線",
-    keys: ["hko:VPA", "hko:VPB", "hko:GSI", "hko:HK2", "hko:IC1", "hko:IC2", "hko:KLT", "yt:TIYZVyzOk4k", "yt:WkcmApaOvWc", "yt:O1oQhMlBiOA", "yt:6YYmUo2TgJ0"],
+    keys: ["hko:VPA", "hko:VPB", "hko:GSI", "hko:HK2", "hko:IC1", "hko:IC2", "hko:KLT", "yt:TIYZVyzOk4k"],
   },
   {
     // Airport trackers, the HZMB port, the TM-CLK tunnel's southern portal (which lands at it; the Tuen Mun end is
@@ -191,7 +238,7 @@ const TOPICS: { id: string; label: string; labelZh: string; keys: string[]; matc
     id: "airport",
     label: "Airport & HZMB",
     labelZh: "機場及港珠澳大橋",
-    keys: ["yt:ygC5wni2DMQ", "yt:JPREngCARsA"],
+    keys: ["yt:ygC5wni2DMQ", "yt:JPREngCARsA", "yt:ZbUAX0ZvTZI"],
     match: /HZMB|TM-CLK Tunnel Southern Portal|Tung Wing Road|North Lantau Highway near (Tung Chung|Caribbean Coast|Ying Tung)/,
   },
   { id: "tunnels", label: "Tunnels", labelZh: "隧道", keys: [], match: /Tunnel/ },
@@ -205,12 +252,29 @@ const TOPICS: { id: string; label: string; labelZh: string; keys: string[]; matc
   },
 ];
 
+const newsKeys = (f: (s: (typeof NEWS_STREAMS)[number]) => boolean) => NEWS_STREAMS.filter(f).map((s) => `yt:${s.id}`);
+function newsGroups(): ChannelGroup[] {
+  return [
+    { id: "news", section: "news", label: "All news", labelZh: "所有新聞", keys: newsKeys(() => true) },
+    { id: "news:zh", section: "news", label: "Chinese-language news", labelZh: "中文新聞", keys: newsKeys((s) => s.lang === "cmn" || s.lang === "yue") },
+    { id: "news:en", section: "news", label: "English news", labelZh: "英語新聞", keys: newsKeys((s) => s.lang === "en") },
+    { id: "news:tw", section: "news", label: "Taiwan news", labelZh: "台灣新聞", keys: newsKeys((s) => s.country === "Taiwan") },
+    { id: "news:apac", section: "news", label: "Asia-Pacific news", labelZh: "亞太新聞", keys: newsKeys((s) => !!s.apac) },
+    { id: "news:intl", section: "news", label: "International news", labelZh: "國際新聞", keys: newsKeys((s) => !s.apac && !s.finance) },
+    { id: "finance", section: "news", label: "Finance & markets", labelZh: "財經及股市", keys: newsKeys((s) => !!s.finance) },
+  ];
+}
+
 function buildGroups(): ChannelGroup[] {
   const keysOf = (list: Channel[]) => list.map((c) => c.key);
   const groups: ChannelGroup[] = [
     { id: "featured", section: "type", label: "Featured", labelZh: "精選", keys: featured() },
     { id: "all", section: "type", label: "All channels", labelZh: "所有頻道", keys: keysOf(CHANNELS) },
-    { id: "kind:yt", section: "type", label: "Live video", labelZh: "直播影像", keys: keysOf(CHANNELS.filter((c) => c.kind === "yt")) },
+    { id: "kind:yt", section: "type", label: "Live video", labelZh: "直播影像", keys: keysOf(CHANNELS.filter((c) => c.kind === "yt" && !["World", "News", "Space"].includes(c.region))) },
+    { id: "world", section: "type", label: "World live", labelZh: "世界直播", keys: keysOf(CHANNELS.filter((c) => c.region === "World")) },
+    { id: "space", section: "type", label: "Space", labelZh: "太空直播", keys: keysOf(CHANNELS.filter((c) => c.region === "Space")) },
+    // News & finance (bank 4xx), by audience.
+    ...newsGroups(),
     { id: "kind:hko", section: "type", label: "HKO weather", labelZh: "天文台天氣", keys: keysOf(CHANNELS.filter((c) => c.kind === "hko")) },
     { id: "kind:td", section: "type", label: "Traffic", labelZh: "交通", keys: keysOf(CHANNELS.filter((c) => c.kind === "td")) },
   ];

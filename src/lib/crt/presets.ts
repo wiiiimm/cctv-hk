@@ -217,8 +217,16 @@ export function videoFilter(p: CrtPreset): string {
 
 /** Curvature actually used: 60% of the preset on desktop, 30% on phones (gentle barrel, more picture). */
 export function crtCurvature(p: CrtPreset): number {
+  if (!curveOn) return 0;
   const phone = typeof window !== "undefined" && Math.min(window.innerWidth, window.innerHeight) < 600;
   return p.curvature * (phone ? 0.3 : 0.6);
+}
+
+// The CURVE toggle (store `crtCurve`): off = every CRT effect except the barrel distortion. Kept here so the
+// renderer, layout, click mapping and compositor all read the same value; CrtScreen keeps it in step with the store.
+let curveOn = true;
+export function setCrtCurve(on: boolean) {
+  curveOn = on;
 }
 
 /** Margin (fraction per side) that keeps picture content clear of the curved, vignetted tube edge. */

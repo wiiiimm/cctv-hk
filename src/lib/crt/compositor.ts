@@ -29,6 +29,8 @@ export interface ScreenView {
   patrol: boolean;
   /** Cells covered by a real YouTube player in the DOM: drawn without a picture (OSD only). */
   videoCells: number[];
+  /** Cells drawn flat on the overlay (all YouTube tiles: players can't be warped, so off-air ones match them). */
+  flatCells?: number[];
   lang: Lang;
   /** Canvas pixels per CSS pixel, so OSD text matches the DOM wall's sizes. */
   scale: number;
@@ -41,6 +43,8 @@ export interface ScreenView {
   count?: number;
   /** News ticker items drawn in a band across the top of the tube (null = off). */
   news?: NewsItem[] | null;
+  /** A live YouTube player sits right under the band: leave the band empty, the flat DOM ticker covers it. */
+  flatTicker?: boolean;
   /** Height of that band in CSS px. */
   newsH?: number;
   aspect?: number;
@@ -128,7 +132,11 @@ function badge(ctx: CanvasRenderingContext2D, label: string, right: number, y: n
   ctx.fillText(label, right - px, y);
 }
 
-function drawCell(ctx: CanvasRenderingContext2D, key: string, x: number, y: number, w: number, h: number, now: number, big: boolean, hideMedia: boolean, lang: Lang, k: number, selected = false) {
+/**
+ * One wall cell: picture (or no-signal screen) on `ctx`, then its OSD (labels, badge, caption, stamp) on `osd` —
+ * the shader canvas normally; the flat overlay above the players for live YouTube cells, so a player never hides it.
+ */
+function drawCell(ctx: CanvasRenderingContext2D, key: string, x: number, y: number, w: number, h: number, now: number, big: boolean, hideMedia: boolean, lang: Lang, k: number, selected = false, osd: CanvasRenderingContext2D = ctx) {
   const t = DICTS[lang];
   const ch = CHANNEL_BY_KEY.get(key);
   ctx.fillStyle = "#050607";
@@ -153,6 +161,7 @@ function drawCell(ctx: CanvasRenderingContext2D, key: string, x: number, y: numb
     text(ctx, label, x + w / 2, y + h / 2 - fs * 0.5, fs, "#ffffff", "center");
   }
 
+  ctx = osd; // everything below is OSD
   const fs = (big ? Math.min(18, Math.max(16, h / k / 40)) : Math.min(15, Math.max(12, Math.min(w, h) / k / 14))) * k;
   const pad = fs * 0.45;
   if (selected) {
@@ -327,7 +336,8 @@ let tickerCache: { items: NewsItem[]; lang: string; fs: number; runs: { tag?: st
 
 function drawTicker(ctx: CanvasRenderingContext2D, items: NewsItem[], lang: Lang, x: number, y: number, w: number, h: number, scale: number, now: number) {
   const d = DICTS[lang];
-  const fs = Math.round(h * 0.78);
+  // VT323 reads small for Latin text: English gets a larger size than the CJK pixel font needs.
+  const fs = Math.round(h * (lang === "en" ? 0.98 : 0.62));
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.9)";
   ctx.fillRect(x, y, w, h);
@@ -389,8 +399,16 @@ function drawTicker(ctx: CanvasRenderingContext2D, items: NewsItem[], lang: Lang
 }
 
 /** Draws the screen and returns each visible cell's rectangle (by cell index) in canvas pixels. */
-export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, v: ScreenView, now: number): Map<number, CellRect> {
+/**
+ * Draws the screen into `ctx` (which goes through the shader). `over` is an optional flat canvas layered above the
+ * YouTube players: OSD belonging to a live YouTube cell is drawn there so the player can't cover it.
+ */
+export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, v: ScreenView, now: number, over?: CanvasRenderingContext2D): Map<number, CellRect> {
   const rects = new Map<number, CellRect>();
+  if (over) over.clearRect(0, 0, w, h);
+  // Flat cells (YouTube) draw on the overlay, above the players; everything else goes into the warped picture.
+  const flat = new Set(v.flatCells ?? v.videoCells);
+  const osdFor = (ci: number) => (over && flat.has(ci) ? over : ctx);
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, w, h);
   const gap = v.single ? 0 : 3 * v.scale;
@@ -398,7 +416,9 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
   const mx = w * v.inset;
   const band = v.news ? (v.newsH ?? 0) * v.scale : 0;
   const my = h * v.inset;
-  if (v.news) drawTicker(ctx, v.news, v.lang, mx, my, w - mx * 2, band - 3 * v.scale, v.scale, now);
+  // Curved (drawn through the shader) unless a YouTube player — which can't be warped — sits right under it; then the
+  // band is left empty and CrtScreen lays a flat ticker over it so the two straight edges line up.
+  if (v.news && !v.flatTicker) drawTicker(ctx, v.news, v.lang, mx, my, w - mx * 2, band - 3 * v.scale, v.scale, now);
   const layout = arrange({ w: w - mx * 2, h: h - my * 2 - band, previewW: v.previewW * v.scale, pinned: v.pinned, pinMode: v.pinMode, solo: v.single, gap, count: v.count, aspect: v.aspect, pinAspect: v.pinAspect });
   const indices = v.single ? [v.selected] : v.cells.map((_, i) => i).slice(0, layout.rects.length);
 
@@ -408,12 +428,18 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
     rects.set(ci, r);
     const big = v.single || (v.pinned && ci === 0);
     const highlight = !v.single && ci === v.selected && !big;
-    drawCell(ctx, v.cells[ci], r.x, r.y, r.w, r.h, now, big, v.videoCells.includes(ci), v.lang, v.scale, highlight);
-    if (highlight) drawSelection(ctx, r, v.scale);
+    const live = v.videoCells.includes(ci);
+    if (over && flat.has(ci) && !live) {
+      // Off-air / loading YouTube tile: the whole tile (no-signal screen + OSD) is flat, like the player it replaces.
+      ctx.fillStyle = "#000";
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      drawCell(over, v.cells[ci], r.x, r.y, r.w, r.h, now, big, false, v.lang, v.scale, highlight, over);
+    } else drawCell(ctx, v.cells[ci], r.x, r.y, r.w, r.h, now, big, live, v.lang, v.scale, highlight, osdFor(ci));
+    if (highlight) drawSelection(osdFor(ci), r, v.scale);
   });
   if (v.pinUi) {
     const r = rects.get(v.pinUi.cell);
-    if (r) drawPinUi(ctx, r, v.pinUi, v.scale);
+    if (r) drawPinUi(osdFor(v.pinUi.cell), r, v.pinUi, v.scale);
   }
 
   // Screen-level OSD (channel number on change, picture mode, sequence) — a notch above the captions.
@@ -427,12 +453,12 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
   };
   if (v.entry) {
     const p = osdAt(v.selected);
-    text(ctx, `CH ${v.entry.padEnd(4, "-")}`, p.x, p.y, big * 1.2, "#7CFF6B", "right");
+    text(v.single ? ctx : osdFor(v.selected), `CH ${v.entry.padEnd(4, "-")}`, p.x, p.y, big * 1.2, "#7CFF6B", "right");
   } else if (now - v.switchedAt < 2500) {
     const cellCh = v.switchedCell >= 0 ? CHANNEL_BY_KEY.get(v.cells[v.switchedCell]) : active;
     if (cellCh) {
       const p = osdAt(v.switchedCell);
-      text(ctx, `CH ${fmtNum(cellCh.num)}`, p.x, p.y, big * 1.2, "#7CFF6B", "right");
+      text(v.single || v.switchedCell < 0 ? ctx : osdFor(v.switchedCell), `CH ${fmtNum(cellCh.num)}`, p.x, p.y, big * 1.2, "#7CFF6B", "right");
     }
   }
   if (now - v.presetAt < 2500) text(ctx, v.presetLabel.toUpperCase(), w / 2, h - my - big * 1.8, big * 0.8, "#7CFF6B", "center");
@@ -446,11 +472,12 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
     const mw = Math.round(cellW * 0.18);
     const mh = Math.round(mw * 0.66);
     const fsCap = 18 * v.scale;
-    ctx.save();
-    ctx.globalAlpha = 0.65;
+    const mc = osdFor(v.single ? v.selected : 0);
+    mc.save();
+    mc.globalAlpha = 0.65;
     // Channel label: left edge at cellX + pad (pad = 0.45·fs), bottom ≈ top + 1.8·fs.
-    drawMap(ctx, pinnedCh.geo.lat, pinnedCh.geo.lon, pinnedCh.geo.approx, cellX + fsCap * 0.45, cellY + fsCap * 2.2, mw, mh, now);
-    ctx.restore();
+    drawMap(mc, pinnedCh.geo.lat, pinnedCh.geo.lon, pinnedCh.geo.approx, cellX + fsCap * 0.45, cellY + fsCap * 2.2, mw, mh, now);
+    mc.restore();
   }
   return rects;
 }

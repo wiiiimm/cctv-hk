@@ -12,7 +12,7 @@ export const hhmm = (iso?: string) =>
  * Crawling news bar above the bottom bar: HKO warnings in force (red), TD special traffic news (amber), then RTHK
  * local headlines — in the viewer's language. Hover (or focus) pauses it; each item links to its source.
  */
-export function NewsTicker() {
+export function NewsTicker({ crt = false, style }: { crt?: boolean; style?: React.CSSProperties } = {}) {
   const t = useT();
   const lang = useStore((s) => s.lang);
   const items = useNews(lang);
@@ -49,7 +49,16 @@ export function NewsTicker() {
     });
 
   return (
-    <div className="news-ticker" role="region" aria-label={t.newsTitle} title={t.newsSource}>
+    <div
+      className={`news-ticker${crt ? " crt" : ""}`}
+      style={style}
+      role="region"
+      aria-label={t.newsTitle}
+      title={t.newsSource}
+      // Inside the CRT tube: don't let ticker clicks fall through to the tube's tile selection.
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
       <span className="nt-label">{t.newsLabel}</span>
       <div className="nt-viewport">
         {items === null ? (

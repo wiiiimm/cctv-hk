@@ -7,7 +7,7 @@ export type { NewsItem };
 
 const REFRESH_MS = 3 * 60_000;
 /** Height (CSS px) of the ticker band the CRT reserves at the top of the tube. */
-export const CRT_NEWS_H = 22;
+export const CRT_NEWS_H = 26;
 
 let items: NewsItem[] | null = null;
 let lang = "";
