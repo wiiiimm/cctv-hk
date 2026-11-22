@@ -440,6 +440,8 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .statusbar b { color: var(--text); font-weight: 500; }
 .statusbar .entry { color: var(--entry); font-family: var(--osd); font-size: 16px; }
 .statusbar .entry b { color: inherit; }
+.statusbar .gh-link { flex: none; display: inline-flex; align-items: center; gap: 5px; color: var(--muted); text-decoration: none; }
+.statusbar .gh-link:hover { color: var(--text); }
 .statusbar .keys { flex: 1 1 0; min-width: 0; display: flex; gap: var(--sp-3); align-items: center; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); }
 .statusbar .keys > span { flex: none; }
 .statusbar .credit { margin-left: auto; color: var(--dim); }
@@ -536,11 +538,11 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .lang-en .news-ticker.crt { font-size: 20px; }
 .lang-en .news-ticker.crt .nt-time, .lang-en .news-ticker.crt .nt-tag { font-size: 17px; }
 /* Chinese runs smaller (dense glyphs read fine at a smaller size). */
-.lang-zh .news-ticker:not(.crt) .nt-text { font-size: 11px; }
-.lang-zh .news-ticker:not(.crt) { height: 24px; line-height: 24px; }
-.lang-zh .news-ticker:not(.crt) .nt-label { line-height: 24px; font-size: 10px; }
-.lang-zh .news-ticker.crt { font-size: 13px; }
-.lang-zh .news-ticker.crt .nt-label { font-size: 13px; }
+.lang-zh .news-ticker:not(.crt) .nt-text { font-size: 12px; }
+.lang-zh .news-ticker:not(.crt) { height: 26px; line-height: 26px; }
+.lang-zh .news-ticker:not(.crt) .nt-label { line-height: 26px; font-size: 11px; }
+.lang-zh .news-ticker.crt { font-size: 14px; }
+.lang-zh .news-ticker.crt .nt-label { font-size: 14px; }
 
 /* Narrow phones: tighter pills so ☰, brand, PATROL, CRT, 中文/EN and ⋯ fit on one row. */
 @media (max-width: 420px) {

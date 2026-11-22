@@ -310,6 +310,7 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
       cancelAnimationFrame(raf);
       ro.disconnect();
       display.remove();
+      ov.remove(); // the flat overlay too, or a remount (hot reload, leaving CRT) leaves its last frame stacked on top
     };
   }, []);
 

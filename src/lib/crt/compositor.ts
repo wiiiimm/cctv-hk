@@ -351,7 +351,7 @@ let tickerCache: { items: NewsItem[]; lang: string; fs: number; runs: { tag?: st
 function drawTicker(ctx: CanvasRenderingContext2D, items: NewsItem[], lang: Lang, x: number, y: number, w: number, h: number, scale: number, now: number) {
   const d = DICTS[lang];
   // VT323 reads small for Latin text: English gets a larger size than the CJK pixel font needs.
-  const fs = Math.round(h * (lang === "en" ? 0.98 : 0.62));
+  const fs = Math.round(h * (lang === "en" ? 0.98 : 0.7));
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.9)";
   ctx.fillRect(x, y, w, h);
