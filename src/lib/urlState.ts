@@ -77,7 +77,8 @@ export function applyView(base: State, search: string): { select?: string } {
       }
       base.groupId = `custom:${found.id}`;
     }
-  } else if (g && GROUP_BY_ID.has(g)) base.groupId = g;
+  } else if (g === "nearby") base.groupId = "nearby"; // the receiver's own location, never the sender's
+  else if (g && GROUP_BY_ID.has(g)) base.groupId = g;
 
   const pg = Number(q.get("pg"));
   base.page = pg >= 1 ? Math.floor(pg) - 1 : 0;

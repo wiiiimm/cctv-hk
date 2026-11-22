@@ -1,7 +1,8 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { CHANNELS, CHANNEL_BY_KEY, GROUPS, fmtNum, type Channel } from "../../lib/channels";
 import { fuzzySearch } from "../../lib/search";
-import { actionTarget, actions, groupKeysOf, store, useStore } from "../../lib/store";
+import { actionTarget, actions, chooseNearby, groupKeysOf, refreshLocation, store, useStore } from "../../lib/store";
+import { NEARBY_MAX, distanceM, fmtDistance } from "../../lib/geo";
 import { chAltName, chDistrict, chName, groupLabel, useT } from "../../lib/i18n";
 import { GroupMenu } from "./GroupMenu";
 import { useListStatus, useListVideo } from "../../lib/snapshots";
@@ -16,6 +17,9 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
   const [nameDraft, setNameDraft] = useState("");
   const current = groupId.startsWith("custom:") ? customGroups.find((g) => `custom:${g.id}` === groupId) : undefined;
   const onAir = useStore((s) => s.cells);
+  const here = useStore((s) => s.here);
+  const locating = useStore((s) => s.locating);
+  const nearby = groupId === "nearby";
   const lang = useStore((s) => s.lang);
   const t = useT();
   const [q, setQ] = useState("");
@@ -41,8 +45,8 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
   const matches = useMemo(() => {
     // Searching looks across every channel (fuzzy, best match first); otherwise show the group in order.
     if (query) return fuzzySearch(CHANNELS, query);
-    return groupKeysOf({ groupId, favourites, customGroups }).map((k) => CHANNEL_BY_KEY.get(k)!);
-  }, [query, groupId, favourites, customGroups]);
+    return groupKeysOf({ groupId, favourites, customGroups, here }).map((k) => CHANNEL_BY_KEY.get(k)!);
+  }, [query, groupId, favourites, customGroups, here]);
   const rows = useMemo(() => matches.slice(0, 400), [matches]);
 
   const other = (lang === "zh" ? "en" : "zh") as Lang;
@@ -69,8 +73,12 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
         <label className="field">
           <span>{t.cameraGroup}</span>
           <span className="group-pick">
-            <select value={groupId} onChange={(e) => actions.loadGroup(e.target.value)}>
+            <select value={groupId} onChange={(e) => (e.target.value === "nearby" ? chooseNearby() : actions.loadGroup(e.target.value))}>
               <optgroup label={t.myGroups}>
+                <option value="nearby">
+                  📍 {t.nearMe} · {lang === "zh" ? "Near me" : "我附近"}
+                  {here ? ` (${NEARBY_MAX})` : ""}
+                </option>
                 <option value="favourites">
                   {t.favourites} ({favourites.length})
                 </option>
@@ -115,6 +123,14 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
               {naming.mode === "new" ? t.create : t.save}
             </button>
           </form>
+        )}
+        {nearby && (
+          <div className="group-tools near-tools">
+            <span className="near-status">{locating ? t.locating : here ? t.nearStatus.replace("{acc}", fmtDistance(here.acc)) : t.nearNeedsLocation}</span>
+            <button type="button" className="link" disabled={locating} onClick={() => refreshLocation(true)}>
+              {here ? t.refreshLocation : t.useLocation}
+            </button>
+          </div>
         )}
         {current && !naming && (
           <div className="group-tools">
@@ -167,6 +183,7 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
                 <span className="label">
                   <span className="nm">{chName(c, lang)}</span>
                   <span className="sub">
+                    {nearby && here && c.geo && <b className="dist">{fmtDistance(distanceM(here, c.geo))}{c.geo.approx ? "≈" : ""} · </b>}
                     {chAltName(c, lang)} · {chDistrict(c, lang)}
                     {c.kind === "td" ? ` ${chDistrict(c, lang === "zh" ? "en" : "zh")}` : ""}
                   </span>

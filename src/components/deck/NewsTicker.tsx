@@ -5,6 +5,8 @@ import { useNews } from "../../lib/news";
 import { wxIconSvg } from "../../lib/wxIcons";
 
 const SPEED = 70; // px per second
+/** Start somewhere along the loop (per page load), not always at the first headline. */
+const START = Math.random();
 
 export const hhmm = (iso?: string) =>
   iso ? new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Hong_Kong", hour: "2-digit", minute: "2-digit" }) : "";
@@ -68,7 +70,7 @@ export function NewsTicker({ crt = false, style }: { crt?: boolean; style?: Reac
         {items === null ? (
           <span className="nt-status">{t.newsLoading}</span>
         ) : list.length ? (
-          <div className="nt-track" ref={track} style={{ animationDuration: `${dur}s` }}>
+          <div className="nt-track" ref={track} style={{ animationDuration: `${dur}s`, animationDelay: `${-START * dur}s` }}>
             {row(0)}
             {row(1)}
           </div>

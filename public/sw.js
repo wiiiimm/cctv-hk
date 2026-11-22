@@ -1,5 +1,5 @@
 'use strict';
-// HK CCTV service worker (modelled on midi-mixer's): an offline app shell, plus "last picture" caches so that with no
+// HK Monitor service worker (modelled on midi-mixer's): an offline app shell, plus "last picture" caches so that with no
 // connection the wall still opens and every camera / weather / data tile shows the last image it had (the tile's age
 // stamp turns amber as usual). Live YouTube can't work offline; those tiles go OFF AIR.
 const VERSION = 'v1';

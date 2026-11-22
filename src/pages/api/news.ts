@@ -45,7 +45,7 @@ const SOURCES = {
   },
 } as const;
 
-const UA = { "user-agent": "cctv-hk/0.1 (open data viewer)" };
+const UA = { "user-agent": "hk-monitor/0.1 (open data viewer)" };
 
 async function get(url: string): Promise<string> {
   const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(6000) });
@@ -101,6 +101,19 @@ async function warnings(lang: "en" | "zh"): Promise<NewsItem[]> {
     }));
 }
 
+/** Readings per place, for the viewer's device to pick the nearest (location never comes here). */
+export interface WeatherPlaces {
+  /** HKO's current weather icon. */
+  icon?: number;
+  /** Temperature at each station (°C), names in the viewer's language. */
+  temps: { place: string; value: number }[];
+  /** Maximum rainfall in the past hour per district (mm). */
+  rain: { place: string; mm: number }[];
+  time?: string;
+}
+
+const places: Record<"en" | "zh", WeatherPlaces | undefined> = { en: undefined, zh: undefined };
+
 interface Rhrread {
   icon?: number[];
   updateTime?: string;
@@ -108,6 +121,7 @@ interface Rhrread {
   humidity?: { data?: { place: string; value: number }[] };
   uvindex?: { data?: { value: number; desc: string }[] } | "";
   tcmessage?: string | string[];
+  rainfall?: { data?: { place: string; max?: number }[] };
 }
 interface Flw { forecastDesc?: string; outlook?: string; tcInfo?: string; updateTime?: string }
 
@@ -118,6 +132,12 @@ async function weather(lang: "en" | "zh"): Promise<NewsItem[]> {
   const out: NewsItem[] = [];
   if (nowRes.status === "fulfilled") {
     const d = JSON.parse(nowRes.value) as Rhrread;
+    places[lang] = {
+      icon: d.icon?.[0],
+      temps: (d.temperature?.data ?? []).filter((x) => typeof x.value === "number").map((x) => ({ place: x.place, value: x.value })),
+      rain: (d.rainfall?.data ?? []).map((x) => ({ place: x.place, mm: Number(x.max) || 0 })),
+      time: isoOrUndef(d.updateTime ?? ""),
+    };
     const at = (list?: { place: string; value: number }[]) => (list?.find((x) => /Observatory|天文台/.test(x.place)) ?? list?.[0])?.value;
     const temp = at(d.temperature?.data);
     const rh = at(d.humidity?.data);
@@ -170,7 +190,7 @@ export const GET: APIRoute = async ({ url }) => {
   const parts = await Promise.allSettled([warnings(lang), weather(lang), traffic(lang), news(lang)]);
   const items = parts.flatMap((p) => (p.status === "fulfilled" ? p.value : []));
   const failed = parts.filter((p) => p.status === "rejected").length;
-  const body = JSON.stringify({ items, failed, at: new Date().toISOString() });
+  const body = JSON.stringify({ items, places: places[lang] ?? null, failed, at: new Date().toISOString() });
   if (failed < parts.length) cache.set(lang, { at: Date.now(), body });
   return json(body);
 };

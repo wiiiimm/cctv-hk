@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 /** How long the CRT stays mounted after switch-off so the collapse-to-dot can play. */
 const CRT_OFF_MS = 950;
+import { SITE } from "../lib/site";
 import { actions, useStore } from "../lib/store";
 import { useControls } from "../hooks/useControls";
 import { TopBar } from "./deck/TopBar";
@@ -94,7 +95,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.lang = lang === "zh" ? "zh-Hant-HK" : "en";
-    document.title = lang === "zh" ? "香港閉路電視 · HK CCTV" : "HK CCTV · 香港閉路電視";
+    document.title = lang === "zh" ? SITE.titleZh : SITE.title;
   }, [lang]);
 
   return (

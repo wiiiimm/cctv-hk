@@ -23,7 +23,7 @@ export function MobileBar() {
   const pages = Math.max(1, Math.ceil(keys.length / n));
   const g = GROUP_BY_ID.get(s.groupId);
   const custom = s.customGroups.find((c) => `custom:${c.id}` === s.groupId);
-  const group = s.groupId === "favourites" ? t.favourites : custom ? custom.name : g ? groupLabel(g, s.lang) : "";
+  const group = s.groupId === "favourites" ? t.favourites : s.groupId === "nearby" ? t.nearMe : custom ? custom.name : g ? groupLabel(g, s.lang) : "";
 
   return (
     <footer className="mobilebar">

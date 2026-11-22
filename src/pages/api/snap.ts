@@ -37,7 +37,7 @@ async function latestData(code: string): Promise<string | null> {
     }
   } else return null;
   for (const url of candidates) {
-    const res = await fetch(url, { method: "HEAD", headers: { "user-agent": "cctv-hk/0.1 (open data viewer)" } }).catch(() => null);
+    const res = await fetch(url, { method: "HEAD", headers: { "user-agent": "hk-monitor/0.1 (open data viewer)" } }).catch(() => null);
     if (res?.ok) {
       found.set(code, { url, at: Date.now() });
       return url;
@@ -54,7 +54,7 @@ export const GET: APIRoute = async ({ url }) => {
   const upstream = data ? await latestData(code) : `https://www.hko.gov.hk/wxinfo/aws/hko_mica/${code.toLowerCase()}/latest_${hd ? "HD_" : ""}${code}.jpg`;
   if (!upstream) return new Response("no recent image", { status: 502 });
 
-  const res = await fetch(upstream, { headers: { "user-agent": "cctv-hk/0.1 (open data viewer)" } });
+  const res = await fetch(upstream, { headers: { "user-agent": "hk-monitor/0.1 (open data viewer)" } });
   if (!res.ok || !res.headers.get("content-type")?.startsWith("image/")) {
     return new Response("upstream unavailable", { status: 502 });
   }

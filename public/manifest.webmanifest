@@ -1,7 +1,7 @@
 {
-  "name": "HK CCTV · 香港閉路電視",
-  "short_name": "HK CCTV",
-  "description": "Channel-surf Hong Kong's open data like a security control room: traffic cameras, weather, radar, live news and Hong Kong YouTube.",
+  "name": "HK Monitor · 香港監察網",
+  "short_name": "HK Monitor",
+  "description": "A CCTV monitor for Hong Kong's open data: 1,000+ live traffic cameras, Observatory weather, radar and satellite, live news and Hong Kong YouTube on one video wall.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

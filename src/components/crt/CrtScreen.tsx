@@ -185,7 +185,7 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
     const out = document.createElement("canvas");
     out.className = "crt-canvas";
     const renderer = CrtRenderer.create(out);
-    document.fonts?.load("24px 'Fusion Pixel 12px Monospaced TC'", "香港閉路電視錄影直播").catch(() => {});
+    document.fonts?.load("24px 'Fusion Pixel 12px Monospaced TC'", "香港監察網閉路電視錄影直播").catch(() => {});
     document.fonts?.load("24px VT323", "CH0123").catch(() => {});
     setFallback(!renderer);
     const display = renderer ? out : src;

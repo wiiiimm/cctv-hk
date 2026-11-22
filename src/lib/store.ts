@@ -1,4 +1,7 @@
 // App state for the viewing engine. The console UI and the CRT shell both read and drive this one store.
+import { distanceM, getPosition, locationGranted, nearbyKeys, type Here } from "./geo";
+import { notify } from "./toast";
+import { DICTS } from "./i18n";
 import { useSyncExternalStore } from "react";
 import { CHANNELS, CHANNEL_BY_KEY, CHANNEL_BY_NUM, GROUPS, GROUP_BY_ID, feedAspect } from "./channels";
 import { applyView, syncUrl } from "./urlState";
@@ -63,12 +66,18 @@ export interface State {
   switchedCell: number;
   /** Digits typed so far for direct channel entry. */
   entry: string;
+  /** The viewer's location for the Near me group / local weather (memory only, never persisted or shared). */
+  here: Here | null;
+  /** Asking the browser for the location right now. */
+  locating: boolean;
 }
 
 const STORAGE_KEY = "cctv-hk:v1";
 const PERSIST: (keyof State)[] = ["previewSize", "pinMode", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "customGroups", "patrolSec", "patrolMode", "muted", "news", "crtCurve", "autoplay"];
 
-function groupKeys(s: Pick<State, "groupId" | "favourites" | "customGroups">): string[] {
+function groupKeys(s: Pick<State, "groupId" | "favourites" | "customGroups"> & { here?: Here | null }): string[] {
+  // Near me before the location is known: the featured line-up until it arrives.
+  if (s.groupId === "nearby") return s.here ? nearbyKeys(s.here) : GROUP_BY_ID.get("featured")!.keys;
   if (s.groupId === "favourites") return s.favourites.length ? s.favourites : GROUP_BY_ID.get("featured")!.keys;
   if (s.groupId.startsWith("custom:")) return s.customGroups.find((g) => `custom:${g.id}` === s.groupId)?.keys ?? [];
   return GROUP_BY_ID.get(s.groupId)?.keys ?? GROUP_BY_ID.get("featured")!.keys;
@@ -111,6 +120,8 @@ function initial(): State {
     switchedAt: 0,
     switchedCell: -1,
     entry: "",
+    here: null,
+    locating: false,
   };
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
@@ -341,6 +352,7 @@ export const actions = {
     const s = get();
     const order = [
       "favourites",
+      ...(s.here ? ["nearby"] : []), // only once located: stepping through groups shouldn't pop a permission prompt
       ...s.customGroups.map((g) => `custom:${g.id}`),
       ...(["topic", "type", "news", "youtube"] as const).flatMap((sec) => GROUPS.filter((g) => g.section === sec).map((g) => g.id)),
       ...GROUPS.filter((g) => g.section === "region" || g.section === "district").map((g) => g.id),
@@ -624,3 +636,34 @@ export function activeKey(s: State): string | undefined {
 
 /** The cell actions apply to when nothing is selected (exported for the guide, map and remote). */
 export const actionTarget = target;
+
+// ---- Near me ----
+/** Choose the Near me group, asking for the location (the browser prompts the first time). */
+export async function chooseNearby(): Promise<void> {
+  const s = get();
+  if (s.groupId !== "nearby") actions.loadGroup("nearby");
+  await refreshLocation(true);
+}
+
+/** Get a fresh position; on success the Near me group (if showing) is rebuilt around it. `loud` shows a toast on failure. */
+export async function refreshLocation(loud: boolean): Promise<boolean> {
+  if (get().locating) return false;
+  update(() => ({ locating: true }));
+  const r = await getPosition();
+  update(() => ({ locating: false }));
+  if (!r.ok) {
+    if (loud) notify(r.why === "denied" ? DICTS[get().lang].geoDenied : DICTS[get().lang].geoUnavailable);
+    return false;
+  }
+  const moved = !get().here || distanceM(get().here!, r.here) > 75;
+  update(() => ({ here: r.here }));
+  if (moved && get().groupId === "nearby") actions.loadGroup("nearby");
+  return true;
+}
+
+// Start-up: if Near me is the group (saved or from a link), or the browser already allows location, get it quietly.
+if (typeof window !== "undefined") {
+  queueMicrotask(async () => {
+    if (get().groupId === "nearby" || (await locationGranted())) refreshLocation(get().groupId === "nearby");
+  });
+}

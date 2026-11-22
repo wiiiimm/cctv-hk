@@ -1,4 +1,4 @@
-# HK CCTV
+# HK Monitor · 香港監察網
 
 Channel-surf Hong Kong's public cameras like a security control room, with an optional colour-CRT monitor mode.
 Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Vercel via `@astrojs/vercel`.
@@ -110,6 +110,12 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   satellite image (254) via `/api/snap?hko=RAD064|RAD128|RAD256|SATASIA` (the relay finds the newest time-named image,
   stepping back); TD speed-map panels (261–265) loaded directly via `Channel.src` (`{lang}` → tc / en). Radar / satellite are also in
   "HKO weather"; the panels in "Traffic" and their HK district / region groups.
+- Near me (`groupId "nearby"`, `lib/geo.ts`): asks for location only when chosen (or silently if already granted);
+  the position stays in memory (never persisted, never in the URL — `g=nearby` gives the receiver their own). Group =
+  the 60 nearest channels with a position (approximate positions ranked +3 km). Geolocation needs https or localhost
+  (not the Tailscale http address). Ticker: `/api/news` also returns per-station temperatures and district rainfall
+  (`places`); `lib/news.ts` composes on the device — warnings first, "Near you · <nearest station>" first and every 6
+  items, 4 random other stations per refresh, raining districts, everything else shuffled by a per-page-load seed.
 - `src/pages/api/snap.ts` — same-origin relay for HKO photos, radar and satellite (no CORS upstream). Allow-listed codes only.
 
 ## Offline / PWA

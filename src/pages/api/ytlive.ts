@@ -28,7 +28,7 @@ export const GET: APIRoute = async ({ url }) => {
   try {
     const res = await fetch(`https://www.youtube.com/channel/${ch}/live`, {
       headers: {
-        "user-agent": "Mozilla/5.0 (compatible; cctv-hk/0.1)",
+        "user-agent": "Mozilla/5.0 (compatible; hk-monitor/0.1)",
         "accept-language": "en",
       },
       signal: AbortSignal.timeout(8000),

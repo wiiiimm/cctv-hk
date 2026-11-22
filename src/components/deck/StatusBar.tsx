@@ -10,7 +10,7 @@ export function StatusBar() {
   const pages = Math.max(1, Math.ceil(keys.length / n));
   const g = GROUP_BY_ID.get(s.groupId);
   const custom = s.customGroups.find((c) => `custom:${c.id}` === s.groupId);
-  const group = s.groupId === "favourites" ? t.favourites : custom ? custom.name : g ? groupLabel(g, s.lang) : "";
+  const group = s.groupId === "favourites" ? t.favourites : s.groupId === "nearby" ? t.nearMe : custom ? custom.name : g ? groupLabel(g, s.lang) : "";
 
   return (
     <footer className="statusbar">
@@ -32,7 +32,7 @@ export function StatusBar() {
       <span className="credit">
         {CHANNELS.length} {t.feeds} · {t.credit}
       </span>
-      <a className="gh-link" href="https://github.com/wiiiimm/cctv-hk" target="_blank" rel="noopener noreferrer" title={t.sourceOnGitHub} aria-label={t.sourceOnGitHub}>
+      <a className="gh-link" href="https://github.com/wiiiimm/hk-monitor" target="_blank" rel="noopener noreferrer" title={t.sourceOnGitHub} aria-label={t.sourceOnGitHub}>
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
           <path
             fill="currentColor"

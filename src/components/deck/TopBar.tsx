@@ -277,8 +277,8 @@ export function TopBar({ onGuide, sidebarShown = true }: { onGuide: () => void; 
       </button>
       <div className="brand">
         <span className="brand-dot" />
-        <b>{lang === "zh" ? "香港閉路電視" : "HK CCTV"}</b>
-        <span className="brand-alt">{lang === "zh" ? "HK CCTV" : "香港閉路電視"}</span>
+        <b>{lang === "zh" ? "香港監察網" : "HK Monitor"}</b>
+        <span className="brand-alt">{lang === "zh" ? "HK Monitor" : "香港監察網"}</span>
       </div>
 
       {compact ? (

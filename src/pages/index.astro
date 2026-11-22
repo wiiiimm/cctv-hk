@@ -4,14 +4,31 @@ import App from "../components/App";
 import "@fontsource/fusion-pixel-12px-monospaced-tc";
 import "../styles/global.css";
 
-// Social previews need absolute URLs: the deployed production domain on Vercel, else wherever this was built / served.
-const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
-const vercelHost = env.VERCEL_PROJECT_PRODUCTION_URL ?? import.meta.env.VERCEL_PROJECT_PRODUCTION_URL;
-const origin = Astro.site?.origin ?? (vercelHost ? `https://${vercelHost}` : Astro.url.origin);
-const title = "HK CCTV · 香港閉路電視";
-const description =
-  "Channel-surf Hong Kong's open data like a security control room: 1,000+ traffic cameras, Observatory weather, radar and satellite, live news and Hong Kong YouTube — on a video wall with patrol sequences and an optional colour CRT monitor.";
+import { SITE, siteOrigin } from "../lib/site";
+
+// Social previews and search engines need absolute URLs.
+const origin = siteOrigin(Astro.site, Astro.url);
+const home = `${origin}/`;
 const image = `${origin}/og.jpg`;
+// One page serves both languages (?lang=en / ?lang=zh); search engines get both as alternates.
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: SITE.name,
+  alternateName: [SITE.nameZh, "HK CCTV monitor"],
+  url: home,
+  description: SITE.description,
+  image,
+  applicationCategory: "MultimediaApplication",
+  operatingSystem: "Any (web browser)",
+  inLanguage: ["en", "zh-Hant-HK"],
+  isAccessibleForFree: true,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "HKD" },
+  browserRequirements: "Requires JavaScript; WebGL for CRT mode",
+  sameAs: [SITE.repo],
+  about: ["Hong Kong traffic cameras", "Hong Kong Observatory weather", "Open data"],
+  isBasedOn: ["https://data.gov.hk", "https://www.hko.gov.hk", "https://www.td.gov.hk"],
+};
 ---
 <!doctype html>
 <html lang="en">
@@ -19,28 +36,40 @@ const image = `${origin}/og.jpg`;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0a0c0f" />
-    <meta name="description" content={description} />
-    <link rel="canonical" href={`${origin}/`} />
+    <meta name="description" content={SITE.description} />
+    <meta name="keywords" content={SITE.keywords} />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="application-name" content={SITE.name} />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="canonical" href={home} />
+    <link rel="alternate" hreflang="en" href={`${home}?lang=en`} />
+    <link rel="alternate" hreflang="zh-Hant-HK" href={`${home}?lang=zh`} />
+    <link rel="alternate" hreflang="x-default" href={home} />
+    <link rel="sitemap" href="/sitemap.xml" />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="HK CCTV" />
-    <meta property="og:title" content={title} />
-    <meta property="og:description" content={description} />
-    <meta property="og:url" content={`${origin}/`} />
+    <meta property="og:site_name" content={`${SITE.name} · ${SITE.nameZh}`} />
+    <meta property="og:title" content={SITE.title} />
+    <meta property="og:description" content={SITE.description} />
+    <meta property="og:url" content={home} />
     <meta property="og:image" content={image} />
+    <meta property="og:image:secure_url" content={image} />
+    <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="HK CCTV video wall in CRT mode: traffic cameras, weather radar, a speed-map panel, the satellite image and a news ticker" />
+    <meta property="og:image:alt" content={SITE.imageAlt} />
     <meta property="og:locale" content="en_HK" />
     <meta property="og:locale:alternate" content="zh_HK" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content={title} />
-    <meta name="twitter:description" content={description} />
+    <meta name="twitter:title" content={SITE.title} />
+    <meta name="twitter:description" content={SITE.description} />
     <meta name="twitter:image" content={image} />
+    <meta name="twitter:image:alt" content={SITE.imageAlt} />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="HK CCTV" />
+    <meta name="apple-mobile-web-app-title" content={SITE.name} />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <!-- Offline support (public/sw.js) runs in production builds only: dev never gets stale cached bundles. -->
     <meta name="service-worker" content={import.meta.env.PROD ? "on" : "off"} />
@@ -48,10 +77,15 @@ const image = `${origin}/og.jpg`;
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://tdcctv.data.one.gov.hk" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600&family=VT323&display=swap" rel="stylesheet" />
-    <title>{title}</title>
+    <title>{SITE.title}</title>
   </head>
   <body>
     <App client:only="react" />
-    <noscript>HK CCTV needs JavaScript to tune into camera feeds.</noscript>
+    <noscript>
+      <h1>{SITE.name} · {SITE.nameZh}</h1>
+      <p>{SITE.description}</p>
+      <p lang="zh-Hant-HK">{SITE.descriptionZh}</p>
+      <p>HK Monitor needs JavaScript to tune into the camera feeds. <a href={SITE.repo}>Source on GitHub</a>.</p>
+    </noscript>
   </body>
 </html>
