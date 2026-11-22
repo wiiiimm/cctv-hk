@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { usePlayerSlot } from "../../hooks/usePlayerSlot";
-import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed, MAX_PLAYING_PREVIEWS } from "../../lib/channels";
-import { getSnap, retain, useSnap } from "../../lib/snapshots";
+import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed } from "../../lib/channels";
+import { retain, useSnap } from "../../lib/snapshots";
 import { lastTouchAt } from "../../hooks/useWallGestures";
 import { CRT_NEWS_H, useNews, type NewsItem } from "../../lib/news";
 import { NewsTicker } from "../deck/NewsTicker";
-import { flatCells, tickerCurves } from "../../lib/crt/flat";
+import { flatCells, tickerCurves, videoCells } from "../../lib/crt/flat";
 import { actions, bigAspect, feedCount, isPatrolSwitch, store, useStore, wallAspect } from "../../lib/store";
 import { drawScreen, mapInsetRect } from "../../lib/crt/compositor";
 import { arrange, publishGeometry, type PinMode, type Rect } from "../../lib/arrange";
@@ -76,30 +76,6 @@ function CrtYouTube({ chKey, rect, muted, big, preview, preset, switchedAt, veil
   );
 }
 
-/**
- * Cells that play a live YouTube player in CRT mode — every visible YouTube tile that is actually live. Off-air /
- * unavailable streams are left to the canvas, which draws the OFF AIR screen like any other dead feed.
- */
-function videoCells(s: { cells: string[]; pinned: boolean; focused: boolean; selected: number; autoplay: boolean }, shown: number): number[] {
-  const isLiveYt = (key: string) => {
-    const c = CHANNEL_BY_KEY.get(key);
-    return c?.kind === "yt" && !c.noEmbed && !!getSnap(key).live; // no-embed channels stay a still on the canvas
-  };
-  if (s.focused) return isLiveYt(s.cells[s.selected]) ? [s.selected] : [];
-  const out: number[] = [];
-  // The pinned and the selected video always play; other previews only with AUTOPLAY on, and at most
-  // MAX_PLAYING_PREVIEWS of them (else the canvas draws a still).
-  let previews = 0;
-  for (let i = 0; i < Math.min(shown, s.cells.length); i++) {
-    if (!isLiveYt(s.cells[i])) continue;
-    if ((s.pinned && i === 0) || i === s.selected) out.push(i);
-    else if (s.autoplay && previews < MAX_PLAYING_PREVIEWS) {
-      out.push(i);
-      previews++;
-    }
-  }
-  return out;
-}
 
 /** Which pin buttons to draw into the CRT picture, mirroring PinControls (pin toggle, then the three sizes). */
 function pinButtons(s: { pinned: boolean; focused: boolean; selected: number; pinMode: string; cells: string[] }, hover: boolean) {
@@ -366,7 +342,7 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   const crt = size.w > 0 ? crtLayout(size.w, size.h, { ...pin, crtPreset: preset, count, aspect, pinAspect, news: newsOn }) : { rects: [] as Rect[], capacity: 0 };
   const rects = crt.rects;
   // One rule for the ticker (lib/crt/flat.ts): it curves unless a flat (YouTube) tile sits in the top row.
-  const flat = flatCells({ cells, focused: pin.focused, selected }, rects.length);
+  const flat = flatCells({ cells, pinned: pin.pinned, focused: pin.focused, selected, autoplay }, rects.length);
   // With CURVE off nothing is warped, so the ticker always goes through the shader (no mismatch possible).
   // Whole-wall change (switchedCell -1 with a new switchedAt): veil again for the static burst — but not for a
   // picture-mode change, which only changes the look (the players stay up).

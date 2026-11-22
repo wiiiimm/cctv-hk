@@ -72,9 +72,10 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   RTHK local RSS — RTHK has no CORS) as one JSON list per language; `lib/news.ts` polls it (3 min) for both views.
   The DOM ticker (`components/deck/NewsTicker.tsx`) sits at the top of the viewer column (never over the sidebar);
   in CRT mode `crtLayout` / the compositor reserve `CRT_NEWS_H` for it. Flat vs curved is decided in one place,
-  `lib/crt/flat.ts`: every YouTube tile (live or off air) is flat — players can't be warped — and is drawn, with its
-  OSD, on a flat overlay canvas above the players (`drawScreen(..., over)`); the ticker curves (shader) unless a
-  YouTube tile is in the top row, then it is a flat DOM strip (`tickerCurves`).
+  `lib/crt/flat.ts`: only YouTube tiles with a playing player (`videoCells`) are flat — players can't be warped — and
+  are drawn, with their OSD, on a flat overlay canvas above the players (`drawScreen(..., over)`, which also gets the
+  preset's colour filter). YouTube stills (AUTOPLAY off, off air, loading) go through the shader like any picture.
+  The ticker curves unless a flat tile is in the top row, then it is a flat DOM strip (`tickerCurves`).
 - YouTube feeds carry estimated positions (`lat`/`lon` in `data/streams.ts`, always approx): the named place, else the
   broadcaster's base / the country's main city; feeds with no single place (ISS, world rotations) have none. Only HK
   feeds take the nearest HK district (`locate`); world / news / space keep their country / place. In CRT the map inset
