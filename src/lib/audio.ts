@@ -1,6 +1,10 @@
 // Tiny WebAudio effects for the CRT shell: channel-change static and the power thunk.
 let ctx: AudioContext | null = null;
-function ac() {
+/** The audio context — or null before the first click / key press (browsers refuse to start audio until then, and
+ * warn in the console for every attempt), so the sound effects are simply skipped. */
+function ac(): AudioContext | null {
+  const activated = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation?.hasBeenActive ?? true;
+  if (!activated) return null;
   ctx ??= new AudioContext();
   if (ctx.state === "suspended") ctx.resume();
   return ctx;
@@ -8,6 +12,7 @@ function ac() {
 
 export function staticBurst(ms = 180, gain = 0.08) {
   const a = ac();
+  if (!a) return;
   const len = Math.floor((a.sampleRate * ms) / 1000);
   const buf = a.createBuffer(1, len, a.sampleRate);
   const d = buf.getChannelData(0);
@@ -26,6 +31,7 @@ export function staticBurst(ms = 180, gain = 0.08) {
 
 export function powerThunk(on: boolean) {
   const a = ac();
+  if (!a) return;
   const o = a.createOscillator();
   const g = a.createGain();
   o.type = "sine";
@@ -41,6 +47,7 @@ export function powerThunk(on: boolean) {
 
 export function click() {
   const a = ac();
+  if (!a) return;
   const o = a.createOscillator();
   const g = a.createGain();
   o.type = "square";

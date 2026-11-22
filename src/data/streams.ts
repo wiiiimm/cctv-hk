@@ -116,6 +116,7 @@ export const WORLD_STREAMS: WorldStream[] = [
   { num: 356, id: "qsrevo5Vdkw", name: "Council Bluffs, Iowa", nameZh: "愛荷華州康瑟爾布拉夫斯", channel: "EarthCam", country: "USA", countryZh: "美國", lat: 41.2619, lon: -95.8608 },
   { num: 357, id: "4LTSTw4jnZc", name: "Sanibel Island", nameZh: "薩尼貝爾島", channel: "EarthCam", country: "USA", countryZh: "美國", lat: 26.4434, lon: -82.1115 },
   { num: 358, id: "5C9oM7C2Q9k", name: "World Trade Center, New York", nameZh: "紐約世貿中心", channel: "EarthCam", country: "USA", countryZh: "美國", lat: 40.7127, lon: -74.0134 },
+  { num: 361, id: "EEM7a3mHMR4", name: "St Peter's Square, Vatican", nameZh: "梵蒂岡聖伯多祿廣場", channel: "Vatican News - English", country: "Vatican City", countryZh: "梵蒂岡", lat: 41.9022, lon: 12.4568 },
 ];
 
 /** 24/7 news (and finance) channels: bank 4xx, grouped by language / region in the "News & finance" section. */
@@ -148,6 +149,8 @@ export interface NewsStream {
   replayMatch?: string;
   /** …and never replay uploads whose title matches this (for channels whose news clips have no common keyword). */
   replayExclude?: string;
+  /** Followed channels only: only ever the live stream — nothing live means OFF AIR, never replays. */
+  liveOnly?: boolean;
   /**
    * The owner blocks playback on other websites (even though YouTube's data says embeddable): never load a player —
    * show the still with a "YouTube ↗" link instead.
@@ -167,6 +170,9 @@ export const NEWS_STREAMS: NewsStream[] = [
   { num: 452, id: "follow-hoy78cablenews", follow: "UC_q7e5XYJB0JDGagcF0KW0w", replayMatch: "新聞", name: "Cable News (HOY 78)", nameZh: "有線新聞 HOY 78", channel: "HOY 78 × 有線新聞 Cable News", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, lat: 22.3712, lon: 114.1123 },
   { num: 453, id: "follow-rthk", follow: "UC6of7UYhctnYmqABjUqzuxw", replayExclude: "香港故事|世界技能|足本重溫", name: "RTHK news (hourly briefs & live events)", nameZh: "香港電台新聞（新聞簡報及現場直播）", channel: "RTHK 香港電台", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, lat: 22.3376, lon: 114.1805 },
   { num: 458, id: "follow-hk01", follow: "UCTxyBu9VWUq5LXezXwy_SGg", replayMatch: "新聞|01國際", name: "HK01 news", nameZh: "香港01 新聞", channel: "香港01", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, lat: 22.287, lon: 114.213 },
+  // Associated Press: followed for its current live stream only (press conferences, events, raw feeds) — OFF AIR when
+  // nothing is live, no replays or recordings.
+  { num: 459, id: "follow-ap", follow: "UC52X5wxOL_s5yw0dQk7NtgA", liveOnly: true, name: "Associated Press (live)", nameZh: "美聯社（直播）", channel: "Associated Press", country: "USA", countryZh: "美國", lang: "en", lat: 40.7127, lon: -74.015 },
   // Horse racing: race-day live shows and tips programmes; replays keep to racing (Fightclub also streams football).
   { num: 455, id: "follow-whr-hk", follow: "UCSuzEzGo0zIK0wcpr8j46QQ", replayMatch: "賽馬", name: "WHR horse racing", nameZh: "贏跑賽馬台", channel: "贏跑賽馬台 WHR-HK", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, racing: true, lat: 22.4006, lon: 114.2036 },
   { num: 456, id: "follow-fightclub-903", follow: "UCUdSiDWBtPZExreighMVfdQ", replayMatch: "賽馬", name: "Fightclub horse racing", nameZh: "博擊會 賽馬", channel: "博擊會 Fightclub", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, racing: true, lat: 22.4006, lon: 114.2036 },
@@ -283,7 +289,7 @@ export const SPACE_STREAMS: SpaceStream[] = [
 export function followedChannels(): { id: string; replayMatch?: string; replayExclude?: string; liveOnly?: boolean; replayDays?: number }[] {
   const out: { id: string; replayMatch?: string; replayExclude?: string; liveOnly?: boolean; replayDays?: number }[] = [...LIVE_STREAMS, ...NEWS_STREAMS].flatMap((s) =>
     s.follow
-      ? [{ id: s.follow, replayMatch: s.replayMatch, replayExclude: "replayExclude" in s ? s.replayExclude : undefined, liveOnly: "liveOnly" in s ? s.liveOnly : undefined }]
+      ? [{ id: s.follow, replayMatch: s.replayMatch, replayExclude: "replayExclude" in s ? (s.replayExclude as string | undefined) : undefined, liveOnly: s.liveOnly }]
       : [],
   );
   for (const r of RECORDING_SOURCES)

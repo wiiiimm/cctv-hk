@@ -2,10 +2,10 @@
 // HK Monitor service worker (modelled on midi-mixer's): an offline app shell, plus "last picture" caches so that with no
 // connection the wall still opens and every camera / weather / data tile shows the last image it had (the tile's age
 // stamp turns amber as usual). Live YouTube can't work offline; those tiles go OFF AIR.
-const VERSION = 'v2';
+const VERSION = 'v3';
 const SHELL = 'shell-' + VERSION;
 const MEDIA = 'media'; // last snapshot per camera / photo / radar / panel / thumbnail (kept across versions)
-const TILES = 'tiles'; // OpenStreetMap tiles already seen
+const TILES = 'tiles-' + VERSION; // OpenStreetMap tiles already seen (always stored as readable CORS responses)
 const DATA = 'data'; // news ticker / followed-channel lookups
 const FONTS = 'fonts'; // Google Fonts CSS + files
 const CAPS = { [MEDIA]: 2500, [TILES]: 1500, [DATA]: 200, [FONTS]: 60 };
@@ -63,7 +63,11 @@ self.addEventListener('install', (event) => event.waitUntil(refreshShell()));
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      for (const key of await caches.keys()) if (key.startsWith('shell-') && key !== SHELL) await caches.delete(key);
+      for (const key of await caches.keys()) {
+        if (key.startsWith('shell-') && key !== SHELL) await caches.delete(key);
+        // Old tile caches could hold opaque copies (see corsFirst); drop them.
+        if ((key === 'tiles' || key.startsWith('tiles-')) && key !== TILES) await caches.delete(key);
+      }
       await self.clients.claim();
     })(),
   );
@@ -90,7 +94,7 @@ self.addEventListener('fetch', (event) => {
   if (url.hostname === 'www.jma.go.jp' && url.pathname.startsWith('/bosai/himawari/'))
     return event.respondWith(url.pathname.endsWith('.json') ? networkFirst(request, DATA, 10000) : cacheFirst(request, MEDIA));
   if (same && (url.pathname === '/api/news' || url.pathname === '/api/ytlive')) return event.respondWith(networkFirst(request, DATA, 10000));
-  if (url.hostname === 'tile.openstreetmap.org') return event.respondWith(cacheFirst(request, TILES));
+  if (url.hostname === 'tile.openstreetmap.org') return event.respondWith(corsFirst(request, TILES));
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') return event.respondWith(staleWhileRevalidate(request, FONTS));
   if (same) return event.respondWith(staleWhileRevalidate(request, SHELL));
 });
@@ -127,6 +131,21 @@ async function cacheFirst(request, name) {
   const response = await fetch(request);
   // Opaque (no-cors) responses are fine for tiles / images drawn by <img>.
   if (response.ok || response.type === 'opaque') await put(name, request, response.clone());
+  return response;
+}
+
+/**
+ * Map tiles are used two ways: as <img> (the sidebar / tile maps — a no-cors request) and drawn into the CRT canvas
+ * (crossOrigin="anonymous" — a CORS request). An opaque copy cached from the first can't answer the second (the image
+ * fails, so the CRT map stayed empty), so tiles are always fetched and stored as CORS responses (OSM allows it), which
+ * answer both.
+ */
+async function corsFirst(request, name) {
+  const cache = await caches.open(name);
+  const hit = await cache.match(request.url);
+  if (hit && hit.type !== 'opaque') return hit;
+  const response = await fetch(request.url, { mode: 'cors', credentials: 'omit' });
+  if (response.ok) await put(name, request.url, response.clone());
   return response;
 }
 
