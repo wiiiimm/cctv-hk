@@ -48,21 +48,36 @@ export function useControls() {
           case "ArrowRight":
             single ? actions.channelStep(1) : actions.moveSelection(1, 0);
             break;
+          // PgUp / PgDn: channel up / down.
           case "PageUp":
-          case "+":
-          case "=":
             actions.channelStep(1);
             break;
           case "PageDown":
+            actions.channelStep(-1);
+            break;
+          // + / = and - / _ (number pad + / − too): next / previous camera group.
+          case "+":
+          case "=":
+            actions.groupStep(1);
+            break;
           case "-":
           case "_":
-            actions.channelStep(-1);
+            actions.groupStep(-1);
             break;
           case "]":
             actions.pageStep(1);
             break;
           case "[":
             actions.pageStep(-1);
+            break;
+          // Camera group also on , / . (and < / >).
+          case ",":
+          case "<":
+            actions.groupStep(-1);
+            break;
+          case ".":
+          case ">":
+            actions.groupStep(1);
             break;
           case "l":
           case "L":

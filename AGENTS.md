@@ -48,6 +48,8 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   predicate, e.g. Islands Watch, Lantau), and location groups. Weather cameras and located YouTube streams take the
   district/region of the nearest TD camera (`locate`), so location groups mix all feed types. Users can also make
   their own groups (`customGroups`, groupId "custom:<id>"); a feed may be in any number of groups.
+- Keys: PgUp / PgDn change channel; + / = and - / _ (number pad + / − too, and , / .) step camera groups in the
+  picker's order (`actions.groupStep`).
 - Pin + the three pinned sizes (wide / side / full) act on the camera, so their home is the sidebar camera panel
   (not the top bar, which holds wall-wide controls). The tile corner keeps a small pin shortcut.
 - Pin / single-view controls are one component and one style everywhere (`components/PinButtons.tsx`, `.icon-btn`):

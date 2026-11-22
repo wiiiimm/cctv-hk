@@ -1,6 +1,6 @@
 // App state for the viewing engine. The console UI and the CRT shell both read and drive this one store.
 import { useSyncExternalStore } from "react";
-import { CHANNELS, CHANNEL_BY_KEY, CHANNEL_BY_NUM, GROUP_BY_ID, feedAspect } from "./channels";
+import { CHANNELS, CHANNEL_BY_KEY, CHANNEL_BY_NUM, GROUPS, GROUP_BY_ID, feedAspect } from "./channels";
 import { applyView, syncUrl } from "./urlState";
 import { PREVIEW_DEFAULT, PREVIEW_MAX, PREVIEW_MIN, PREVIEW_STEP, liveGeometry, neighbour, type PinMode } from "./arrange";
 
@@ -336,6 +336,18 @@ export const actions = {
    * Switch camera group. A pinned video stays pinned only if it is part of the new group (previews refill around
    * it without repeating it); otherwise the pin is released and the wall shows the group's first page.
    */
+  /** Previous / next camera group, in the picker's order (favourites, my groups, topics, types, news, YouTube, regions). */
+  groupStep(dir: number) {
+    const s = get();
+    const order = [
+      "favourites",
+      ...s.customGroups.map((g) => `custom:${g.id}`),
+      ...(["topic", "type", "news", "youtube"] as const).flatMap((sec) => GROUPS.filter((g) => g.section === sec).map((g) => g.id)),
+      ...GROUPS.filter((g) => g.section === "region" || g.section === "district").map((g) => g.id),
+    ];
+    const i = order.indexOf(s.groupId);
+    actions.loadGroup(order[(i + dir + order.length) % order.length]);
+  },
   loadGroup(groupId: string) {
     update((s) => {
       const keys = groupKeys({ ...s, groupId });

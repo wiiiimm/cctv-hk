@@ -10,11 +10,7 @@ const KEY_TO_BTN: Record<string, string> = {
   Backspace: "clr",
   Escape: "clr",
   PageUp: "ch+",
-  "+": "ch+",
-  "=": "ch+",
   PageDown: "ch-",
-  "-": "ch-",
-  _: "ch-",
   "]": "pg+",
   "[": "pg-",
 };
