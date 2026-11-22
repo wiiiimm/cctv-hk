@@ -92,6 +92,8 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   error also marks a video unavailable and is logged to the console as `[yt] error <code> <channel>`.
 - YouTube off-air reasons (`Snap.reason`): "offair" = not broadcasting (OFF AIR); "blocked" = the owner won't let it
   play here (UNAVAILABLE + "May be region-restricted").
+- Paging under a pin sets `switchedCell` -2: the compositor flashes static on each preview only (canvas noise, YouTube
+  previews via their CSS burst), no veil, the pinned video untouched. Dev aid: `window.__crtPageSw = true` holds it.
 - CRT veil: the live layers (players, flat overlay, flat ticker) hide during power-on (mount / refresh / entering CRT)
   and whole-wall changes (page, group) so the warm-up / static shows, then fade in; picture-mode changes don't veil.
 - AUTOPLAY toggle (`autoplay`, URL `autoplay=0`): off = YouTube previews show a still (refreshed each liveness
@@ -101,7 +103,11 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   Toggle: NEWS (`news`, URL `news=0`).
 - Maps fly between locations (`flyView` / `tilesForView` in `lib/maptiles.ts`, used by `MiniMap` and the CRT map
   inset): pan for short hops, zoom out–pan–in for long ones; the pin rides with the map.
-- `src/pages/api/snap.ts` — same-origin relay for HKO photos (no CORS upstream). Allow-listed station codes only.
+- Live data (`data/live-data.ts`, group "Live data / 實時數據"): HKO radar 64/128/256 km (251–253) and the global
+  satellite image (254) via `/api/snap?hko=RAD064|RAD128|RAD256|SATASIA` (the relay finds the newest time-named image,
+  stepping back); TD speed-map panels (261–265) loaded directly via `Channel.src` (`{lang}` → tc / en). Radar / satellite are also in
+  "HKO weather"; the panels in "Traffic" and their HK district / region groups.
+- `src/pages/api/snap.ts` — same-origin relay for HKO photos, radar and satellite (no CORS upstream). Allow-listed codes only.
 
 ## Design tokens
 

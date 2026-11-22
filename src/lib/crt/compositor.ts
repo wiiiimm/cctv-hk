@@ -451,6 +451,25 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
     } else drawCell(ctx, v.cells[ci], r.x, r.y, r.w, r.h, now, big, live, v.lang, v.scale, highlight, osdFor(ci));
     if (highlight) drawSelection(osdFor(ci), r, v.scale);
   });
+  // Previews paged under a pinned video (switchedCell -2): a static burst on each preview only (canvas noise, so it
+  // still goes through the CRT look), the pinned video untouched.
+  // Dev aid: window.__crtPageSw = true holds this previews-only static on (for inspection).
+  const holdPage = import.meta.env.DEV && (globalThis as unknown as { __crtPageSw?: boolean }).__crtPageSw;
+  const pageSince = holdPage ? 60 : now - v.switchedAt;
+  if ((v.switchedCell === -2 || holdPage) && pageSince < 260) {
+    const amt = 0.9 * (1 - pageSince / 260);
+    rects.forEach((r, ci) => {
+      if (v.pinned && ci === 0) return;
+      const c = osdFor(ci); // YouTube previews are drawn on the flat overlay, so their static goes there too
+      const pat = c.createPattern(noiseTile(), "repeat")!;
+      pat.setTransform(new DOMMatrix().translate((Math.random() * 64) | 0, (Math.random() * 64) | 0)); // move the grain each frame
+      c.save();
+      c.globalAlpha = amt;
+      c.fillStyle = pat;
+      c.fillRect(r.x, r.y, r.w, r.h);
+      c.restore();
+    });
+  }
   if (v.pinUi) {
     const r = rects.get(v.pinUi.cell);
     if (r) drawPinUi(osdFor(v.pinUi.cell), r, v.pinUi, v.scale);
@@ -469,7 +488,8 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
     const p = osdAt(v.selected);
     text(v.single ? ctx : osdFor(v.selected), `CH ${v.entry.padEnd(4, "-")}`, p.x, p.y, big * 1.2, "#7CFF6B", "right");
   } else if (now - v.switchedAt < 2500) {
-    const cellCh = v.switchedCell >= 0 ? CHANNEL_BY_KEY.get(v.cells[v.switchedCell]) : active;
+    // -2 (previews paged): no channel number — several tiles changed, the pinned one didn't.
+    const cellCh = v.switchedCell >= 0 ? CHANNEL_BY_KEY.get(v.cells[v.switchedCell]) : v.switchedCell === -1 ? active : undefined;
     if (cellCh) {
       const p = osdAt(v.switchedCell);
       text(v.single || v.switchedCell < 0 ? ctx : osdFor(v.switchedCell), `CH ${fmtNum(cellCh.num)}`, p.x, p.y, big * 1.2, "#7CFF6B", "right");

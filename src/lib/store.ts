@@ -372,7 +372,8 @@ export const actions = {
       const pages2 = Math.max(1, Math.ceil(pool.length / n));
       const page2 = (s.page + dir + pages2) % pages2;
       const cells = [...s.cells.slice(0, fixed), ...pageCells(pool, page2, n)];
-      return { page: page2, cells, switchedAt: Date.now(), switchedCell: -1 };
+      // Pinned: only the previews changed (-2 = "all previews", leaving the pinned video alone); else the whole wall.
+      return { page: page2, cells, switchedAt: Date.now(), switchedCell: fixed ? -2 : -1 };
     });
   },
   channelStep(dir: number) {

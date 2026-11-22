@@ -1,5 +1,6 @@
 import tdCameras from "../data/td-cameras.json";
 import { HKO_STATIONS } from "../data/hko-stations";
+import { DATA_FEEDS } from "../data/live-data";
 import { LIVE_STREAMS, NEWS_STREAMS, RECORDING_SOURCES, SPACE_STREAMS, WORLD_STREAMS } from "../data/streams";
 
 export type FeedKind = "td" | "hko" | "yt";
@@ -24,6 +25,8 @@ export interface Channel {
   recIndex?: number;
   /** Owner blocks playback on other sites: show the still + "YouTube ↗", never a player. */
   noEmbed?: boolean;
+  /** Direct image URL overriding the kind's usual one ({lang} → tc / en), e.g. TD speed-map panels. */
+  src?: string;
   /** How often the source publishes a new picture. */
   refreshMs: number;
 }
@@ -148,6 +151,23 @@ function build(): Channel[] {
     }),
   );
 
+  // Live data (radar, satellite, speed-map panels): see data/live-data.ts.
+  for (const d of DATA_FEEDS)
+    out.push({
+      key: `${d.kind}:${d.code}`,
+      num: d.num,
+      kind: d.kind,
+      code: d.code,
+      src: d.src,
+      name: d.name,
+      nameZh: d.nameZh,
+      region: "Live data",
+      regionZh: "實時數據",
+      district: d.kind === "hko" ? "Observatory" : "Transport Department",
+      districtZh: d.kind === "hko" ? "天文台" : "運輸署",
+      geo: d.lat != null && d.lon != null ? { lat: d.lat, lon: d.lon, approx: false } : undefined,
+      refreshMs: d.refreshMs,
+    });
   HKO_STATIONS.forEach((s, i) =>
     out.push({
       key: `hko:${s.code}`,
@@ -195,10 +215,13 @@ function build(): Channel[] {
  * the location groups (TD cameras cover all 18 districts). Feeds without a location keep their own labels.
  */
 function locate(channels: Channel[]): Channel[] {
-  const td = channels.filter((c) => c.kind === "td" && c.geo);
+  const td = channels.filter((c) => c.kind === "td" && c.geo && c.region !== "Live data"); // real cameras only
   return channels.map((c) => {
     // Only Hong Kong feeds take the nearest HK district; world / news / space keep their own country / place.
-    if (c.kind === "td" || !c.geo || c.code.startsWith("rec-") || ["World", "News", "Space", "Racing", "Recorded"].includes(c.region)) return c;
+    // Traffic cameras already have their district. Live data: the speed-map panels (fixed roadside spots) take their
+    // district too; radar / satellite cover all of HK or wider, so they stay out of the location groups.
+    const panel = c.region === "Live data" && c.kind === "td";
+    if ((c.kind === "td" && !panel) || !c.geo || (c.region === "Live data" && !panel) || c.code.startsWith("rec-") || ["World", "News", "Space", "Racing", "Recorded"].includes(c.region)) return c;
     let best = td[0];
     let bestD = Infinity;
     for (const t of td) {
@@ -330,6 +353,7 @@ function buildGroups(): ChannelGroup[] {
     { id: "featured", section: "type", label: "Featured", labelZh: "精選", keys: featured() },
     { id: "all", section: "type", label: "All channels", labelZh: "所有頻道", keys: keysOf(CHANNELS) },
     { id: "kind:yt", section: "type", label: "Live video", labelZh: "直播影像", keys: keysOf(CHANNELS.filter((c) => c.kind === "yt" && !c.code.startsWith("rec-") && !["World", "News", "Space", "Racing", "Recorded"].includes(c.region))) },
+    { id: "live-data", section: "type", label: "Live data", labelZh: "實時數據", keys: DATA_FEEDS.map((d) => `${d.kind}:${d.code}`) },
     { id: "world", section: "type", label: "World live", labelZh: "世界直播", keys: keysOf(CHANNELS.filter((c) => c.region === "World")) },
     { id: "space", section: "type", label: "Space", labelZh: "太空直播", keys: keysOf(CHANNELS.filter((c) => c.region === "Space")) },
     // News & finance (bank 4xx), by audience.
@@ -412,6 +436,10 @@ export const GROUP_BY_ID = new Map(GROUPS.map((g) => [g.id, g]));
 
 /** Raw snapshot URL for a still-image feed. HKO goes through the same-origin relay (no CORS upstream). */
 export function snapshotUrl(ch: Channel, hd = false): string | null {
+  if (ch.src) {
+    const zh = typeof document !== "undefined" && document.documentElement.lang.startsWith("zh");
+    return ch.src.replace("{lang}", zh ? "tc" : "en");
+  }
   switch (ch.kind) {
     case "td":
       return `https://tdcctv.data.one.gov.hk/${ch.code}.JPG`;

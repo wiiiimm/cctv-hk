@@ -293,7 +293,8 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
         octx,
       );
       const since = now - s.switchedAt;
-      let staticAmt = since < 260 ? 0.85 * (1 - since / 260) : 0;
+      // -2 (previews paged under a pinned video): the static is drawn into each preview by the compositor instead.
+      let staticAmt = since < 260 && s.switchedCell !== -2 ? 0.85 * (1 - since / 260) : 0;
       // Dev aid: window.__crtSw = 0.85 holds the channel-change static at that strength.
       const dbgSw = import.meta.env.DEV ? (window as unknown as { __crtSw?: number }).__crtSw : undefined;
       if (dbgSw != null) staticAmt = dbgSw;
@@ -412,7 +413,8 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
         const rect = pin.focused ? rects[0] : rects[i];
         if (!rect) return null;
         const big = pin.focused || (pin.pinned && i === 0);
-        const hit = switchedCell === -1 || switchedCell === i;
+        // Static burst on a YouTube tile: whole-wall change, its own retune, or a preview when the previews paged.
+        const hit = switchedCell === -1 || switchedCell === i || (switchedCell === -2 && !(pin.pinned && i === 0));
         return (
           <CrtYouTube key={`${cells[i]}-${i}`} chKey={cells[i]} rect={rect} big={big} muted={muted || !(big || (!pin.pinned && !pin.focused && i === selected))} preset={presetById(preset)} switchedAt={hit ? switchedAt : 0} veiled={veiled} />
         );
