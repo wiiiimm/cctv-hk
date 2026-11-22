@@ -73,15 +73,24 @@ export function FocusPanel({ compact = false }: { compact?: boolean }) {
           </>
         )}
       </dl>
-      <div className="panel-actions">
+      {/* Row 1: channel down / up, half width each. */}
+      <div className="panel-ch">
         <button type="button" className="btn" onClick={() => actions.channelStep(-1)} title="PgDn / −">{t.chDown}</button>
         <button type="button" className="btn" onClick={() => actions.channelStep(1)} title="PgUp / +">{t.chUp}</button>
-        <PinToggle />
-        <PinModes />
-        <button type="button" className={`icon-btn${fav ? " on" : ""}`} onClick={() => actions.toggleFavourite(ch.key)} title="*" aria-label={fav ? t.removeFav : t.addFav} aria-pressed={fav}>
-          ★
-        </button>
-        <GroupMenu chKey={ch.key} />
+      </div>
+      {/* Row 2: everything that acts on this camera — pin + pinned sizes, favourite, add to my groups. */}
+      <div className="panel-actions">
+        <span className="pin-cluster" role="group" aria-label={t.pinModes}>
+          <PinToggle />
+          <PinModes />
+        </span>
+        {/* Favourite and groups sit at the right end of the row. */}
+        <span className="panel-actions-end">
+          <button type="button" className={`icon-btn${fav ? " on" : ""}`} onClick={() => actions.toggleFavourite(ch.key)} title="*" aria-label={fav ? t.removeFav : t.addFav} aria-pressed={fav}>
+            ★
+          </button>
+          <GroupMenu chKey={ch.key} />
+        </span>
       </div>
       {ch.geo ? (
         showMap && <MiniMap lat={ch.geo.lat} lon={ch.geo.lon} approx={ch.geo.approx} label={chName(ch, lang)} />

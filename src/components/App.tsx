@@ -16,6 +16,17 @@ export default function App() {
   const lang = useStore((s) => s.lang);
   const theater = useStore((s) => s.theater);
   const [guideOpen, setGuideOpen] = useState(false);
+  // Esc closes the drawer first (before Esc's usual unpin / deselect).
+  useEffect(() => {
+    if (!guideOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopImmediatePropagation();
+      setGuideOpen(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [guideOpen]);
   // Keep the CRT on screen briefly after it is switched off so it can power down.
   const [lastMode, setLastMode] = useState(mode);
   const [crtExit, setCrtExit] = useState(false);
@@ -36,9 +47,11 @@ export default function App() {
 
   return (
     <div className={`app mode-${mode} lang-${lang}${theater ? " theater" : ""}${guideOpen ? " guide-open" : ""}`}>
-      <TopBar onGuide={() => setGuideOpen((v) => !v)} />
+      <TopBar onGuide={() => setGuideOpen((v) => !v)} guideOpen={guideOpen} />
       <div className="body">
-        <Sidebar onPick={() => setGuideOpen(false)} />
+        <Sidebar onPick={() => setGuideOpen(false)} onClose={() => setGuideOpen(false)} />
+        {/* Drawer mode only (hidden on wide screens): click outside the drawer to close it. */}
+        {guideOpen && <div className="drawer-backdrop" onClick={() => setGuideOpen(false)} aria-hidden />}
         {/* CRT is a picture mode of the same viewer, not a separate screen. */}
         <main className="stage">
           {mode === "crt" || crtExit ? <CrtScreen exiting={mode !== "crt"} /> : <VideoWall />}

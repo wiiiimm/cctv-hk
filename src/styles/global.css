@@ -194,7 +194,18 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .group-map-legend .gm-pin { position: static; margin: 0; pointer-events: none; }
 .group-map-foot { display: flex; justify-content: space-between; gap: var(--sp-2); font-size: var(--fs-xs); color: var(--dim); }
 
+/* Drawer header: only shown when the sidebar is a slide-out drawer (see the 1180px breakpoint). */
+.drawer-head { display: none; align-items: center; justify-content: space-between; padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--line); font-size: var(--fs-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.drawer-close { width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--panel-2); color: var(--text); font-size: 18px; line-height: 1; cursor: pointer; }
+.drawer-close:hover { border-color: var(--line-3); background: var(--panel-3); }
+.drawer-backdrop { display: none; }
+
 /* ---------- selected / pinned video details ---------- */
+.panel-ch { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-1); }
+.panel-ch .btn { width: 100%; justify-content: center; }
+.panel-actions { flex-wrap: nowrap; }
+.panel-actions-end { margin-left: auto; display: inline-flex; gap: var(--sp-1); }
+.pin-cluster { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r); background: var(--well); border: 1px solid var(--line); }
 .panel-close { margin-left: auto; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 1px solid transparent; border-radius: var(--r-sm); background: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; }
 .panel-close:hover { color: var(--text); border-color: var(--line-2); background: var(--panel-3); }
 .panel-head .kind + .panel-close { margin-left: auto; }
@@ -370,6 +381,9 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
   .body { grid-template-columns: minmax(0, 1fr); }
   .sidebar { position: fixed; z-index: 20; top: 0; bottom: 0; left: 0; width: min(340px, 88vw); transform: translateX(-100%); transition: transform 0.2s; box-shadow: var(--shadow-pop); }
   .guide-open .sidebar { transform: none; }
+  /* Drawer: header with a close button, and a dimmed backdrop that closes it on click. */
+  .drawer-head { display: flex; }
+  .drawer-backdrop { display: block; position: fixed; inset: 0; z-index: 19; background: rgba(0, 0, 0, 0.5); }
   .guide-toggle { display: inline-grid; }
   .statusbar .keys { display: none; }
 }

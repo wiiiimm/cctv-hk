@@ -3,10 +3,10 @@ import { PRESETS } from "../../lib/crt/presets";
 import { PREVIEW_MAX, PREVIEW_MIN, PREVIEW_STEP } from "../../lib/arrange";
 import { useT } from "../../lib/i18n";
 import { hkDate, hkTime, useClock } from "../../hooks/useClock";
-import { IconButton, PinModes, PinToggle } from "../PinButtons";
+import { IconButton } from "../PinButtons";
 import { BiggerIcon, SmallerIcon } from "../icons";
 
-export function TopBar({ onGuide }: { onGuide: () => void }) {
+export function TopBar({ onGuide, guideOpen = false }: { onGuide: () => void; guideOpen?: boolean }) {
   const { previewSize, cells, pinned, patrol, patrolSec, patrolMode, muted, mode, crtPreset, lang, theater } = useStore((s) => s);
   const previews = Math.max(0, cells.length - (pinned ? 1 : 0));
   const t = useT();
@@ -15,7 +15,9 @@ export function TopBar({ onGuide }: { onGuide: () => void }) {
 
   return (
     <header className="topbar">
-      <button type="button" className="guide-toggle" onClick={onGuide} aria-label={t.guide}>☰</button>
+      <button type="button" className="guide-toggle" onClick={onGuide} aria-label={guideOpen ? t.closeMenu : t.guide} aria-expanded={guideOpen}>
+        {guideOpen ? "×" : "☰"}
+      </button>
       <div className="brand">
         <span className="brand-dot" />
         <b>{lang === "zh" ? "香港閉路電視" : "HK CCTV"}</b>
@@ -40,8 +42,6 @@ export function TopBar({ onGuide }: { onGuide: () => void }) {
         <span className="preview-count" title={t.previewCount}>
           {previews}
         </span>
-        <PinToggle />
-        <PinModes />
       </div>
 
       <div className="tb-group" role="group" aria-label={t.patrol}>
