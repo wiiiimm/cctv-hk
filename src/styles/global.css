@@ -397,6 +397,21 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .tile-play { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; color: rgba(255, 255, 255, 0.8); text-shadow: 0 0 12px #000; pointer-events: none; }
 @container (max-width: 300px) { .osd-stamp { display: none; } }
 @container (max-height: 110px) { .osd-bottom { display: none; } }
+.osd-meta { display: none; }
+/* Phones: previews carry the full caption in small type — name (two lines), other-language name, area and time. */
+@media (max-width: 760px) {
+  .tile:not(.large) .osd { font-size: 12px; }
+  .tile:not(.large) .osd-bottom { display: flex; padding: 0 3px 3px; }
+  .tile:not(.large) .osd-stamp { display: none; }
+  .tile:not(.large) .osd-title { gap: 1px; }
+  .tile:not(.large) .osd-title > span { padding: 1px 3px 1px; line-height: 1.05; }
+  .tile:not(.large) .osd-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .tile:not(.large) .osd-alt, .tile:not(.large) .osd-meta { display: block; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .tile:not(.large) .osd-tl b { padding: 1px 3px; }
+  .tile:not(.large) .osd-tl .kind { font-size: 9px; }
+  /* Very small previews: name and time only. */
+  @container (max-height: 110px) { .tile:not(.large) .osd-alt { display: none; } .tile:not(.large) .osd-name { -webkit-line-clamp: 1; } }
+}
 
 
 /* ---------- status bar ---------- */

@@ -2,9 +2,9 @@ import { memo, useRef } from "react";
 import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed } from "../../lib/channels";
 import { useSnap } from "../../lib/snapshots";
 import { actions, store, useStore } from "../../lib/store";
-import { chAltName, chName, useT } from "../../lib/i18n";
+import { chAltName, chName, useT, chDistrict } from "../../lib/i18n";
 import { PinControls, type PinRole } from "./PinControls";
-import { ago, hkStamp, useClock } from "../../hooks/useClock";
+import { ago, hkStamp, hkTime, useClock } from "../../hooks/useClock";
 import "./osd.css";
 import { useYouTubeErrors } from "../../hooks/useYouTubeErrors";
 import { lastTouchAt } from "../../hooks/useWallGestures";
@@ -103,6 +103,11 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
             <span className="osd-title">
               <span className="osd-name">{name}</span>
               <span className="osd-alt">{chAltName(ch, lang)}</span>
+              {/* Phones: area + picture time inside the caption block (the separate stamp is hidden there). */}
+              <span className="osd-meta">
+                {chDistrict(ch, lang)} · {isVideo ? hkTime(now) : snap.takenAt ? hkTime(snap.takenAt) : "--"}
+                {!isVideo && snap.takenAt ? <span className="age"> +{ago(snap.takenAt, now)}</span> : null}
+              </span>
             </span>
             <span className="osd-stamp">
               {isVideo ? hkStamp(now) : snap.takenAt ? hkStamp(snap.takenAt) : "--"}
