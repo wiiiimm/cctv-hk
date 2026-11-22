@@ -5,7 +5,7 @@ import { lastTouchAt } from "../../hooks/useWallGestures";
 import { CRT_NEWS_H, useNews, type NewsItem } from "../../lib/news";
 import { NewsTicker } from "../deck/NewsTicker";
 import { flatCells, tickerCurves } from "../../lib/crt/flat";
-import { actions, bigAspect, feedCount, store, useStore, wallAspect } from "../../lib/store";
+import { actions, bigAspect, feedCount, isPatrolSwitch, store, useStore, wallAspect } from "../../lib/store";
 import { drawScreen } from "../../lib/crt/compositor";
 import { arrange, publishGeometry, type PinMode, type Rect } from "../../lib/arrange";
 import { CrtRenderer, ON, powerOff, powerOn, unwarp } from "../../lib/crt/renderer";
@@ -235,7 +235,9 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
       const now = Date.now();
       if (s.switchedAt !== lastSwitch) {
         lastSwitch = s.switchedAt;
-        if (!s.muted) staticBurst();
+        // The static sound is feedback for the viewer's own channel changes; patrol switches stay silent
+        // (the picture still flashes static).
+        if (!s.muted && !isPatrolSwitch(s.switchedAt)) staticBurst();
       }
       if (s.crtPreset !== lastPreset) {
         lastPreset = s.crtPreset;

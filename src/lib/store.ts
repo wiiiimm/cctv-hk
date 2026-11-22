@@ -266,6 +266,8 @@ const capacityOr = (fallback: number) => (wallCapacity > 0 ? wallCapacity : fall
 let rollCursor = 0;
 let rollSlot = 0;
 let lastTick = 0;
+/** True when the last channel change was the patrol's doing (it stamps switchedAt with lastTick), not the viewer's. */
+export const isPatrolSwitch = (switchedAt: number) => switchedAt === lastTick;
 /** When the last automatic sequence change happened (to tell it apart from manual changes). */
 export const lastSequenceTick = () => lastTick;
 
