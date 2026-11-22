@@ -381,6 +381,10 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .tile iframe.tile-media { pointer-events: none; }
 .tile-nosignal { position: absolute; inset: 0; display: grid; place-items: center; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.2 -.1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") #0b0c0e; animation: snow 0.25s steps(4) infinite; }
 .tile-nosignal span { font: 22px var(--osd); letter-spacing: 0.1em; background: #1a2a8c; color: #fff; padding: 2px 10px; }
+/* Second line under UNAVAILABLE ("May be region-restricted"): quiet, small, same pixel font. */
+.tile-nosignal { align-content: center; gap: 6px; }
+.tile-nosignal small { font: 14px var(--osd); letter-spacing: 0.04em; color: #dfe3ea; background: rgba(0, 0, 0, 0.7); padding: 1px 8px; justify-self: center; }
+@container (max-width: 200px) { .tile-nosignal span { font-size: 16px; } .tile-nosignal small { font-size: 11px; } }
 .tile-nosignal.searching { animation-duration: 0.6s; opacity: 0.85; }
 .tile-nosignal.searching span { background: rgba(0, 0, 0, 0.6); color: var(--muted); }
 @keyframes snow { 0% { background-position: 0 0; } 25% { background-position: -40px 20px; } 50% { background-position: 30px -50px; } 75% { background-position: -70px -10px; } }
@@ -534,3 +538,7 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
   .topbar.compact .tb-compact-end { gap: 3px; }
   .topbar.compact { gap: var(--sp-2); padding-left: 8px; padding-right: 8px; }
 }
+
+/* CRT veil (power-on / whole-wall change): live layers hide so the shader's warm-up / static shows, then fade in. */
+.crt-video, .crt-overlay-host { transition: opacity 0.25s ease-out; }
+.crt-video.veiled, .crt-overlay-host.veiled { opacity: 0; transition: none; }

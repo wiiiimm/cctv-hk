@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ATTRIBUTION, FLIGHT_MS, flyView, pointIn, reducedMotion, tilesForView, viewOf, type MapView } from "../lib/maptiles";
+import { ATTRIBUTION, FLIGHT_MS, fmtLatLon, flyView, pointIn, reducedMotion, tilesForView, viewOf, type MapView } from "../lib/maptiles";
 import { useT } from "../lib/i18n";
 
 interface Props {
@@ -70,7 +70,7 @@ export function MiniMap({ lat, lon, approx, label }: Props) {
       </div>
       <figcaption>
         <span>
-          {lat.toFixed(5)}N {lon.toFixed(5)}E{approx ? ` · ${t.approx}` : ""}
+          {fmtLatLon(lat, lon)}{approx ? ` · ${t.approx}` : ""}
         </span>
         <a href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=17/${lat}/${lon}`} target="_blank" rel="noreferrer">
           {ATTRIBUTION}

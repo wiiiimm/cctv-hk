@@ -17,6 +17,11 @@ export interface Snap {
   fetchedAt?: number;
   /** YouTube only: whether the stream is currently live. */
   live?: boolean;
+  /**
+   * YouTube only, when not playable: "offair" = not broadcasting; "blocked" = broadcasting, but the owner doesn't
+   * let it play here (embedding / website / region limits).
+   */
+  reason?: "offair" | "blocked";
 }
 
 interface Entry {
@@ -82,7 +87,7 @@ const UNAVAILABLE_MS = 10 * 60_000;
 /** Called when an embedded player reports "Video unavailable" (error 100 / 101 / 150 …). */
 export function markUnavailable(key: string) {
   unavailableUntil.set(key, Date.now() + UNAVAILABLE_MS);
-  set(key, { live: false, status: "offline" });
+  set(key, { live: false, status: "offline", reason: "blocked" });
 }
 
 async function load(key: string) {
@@ -98,7 +103,7 @@ async function load(key: string) {
       const [onAir, canEmbed] = await Promise.all([probeLive(ch.code), embeddable(ch.code), fetchInto(key, e.snap.url ? bust(src!) : src!).catch(() => {})]);
       const blocked = (unavailableUntil.get(key) ?? 0) > Date.now();
       const live = onAir && canEmbed && !blocked;
-      set(key, { live, status: live ? "ok" : "offline" });
+      set(key, { live, status: live ? "ok" : "offline", reason: live ? undefined : !onAir ? "offair" : "blocked" });
     } else {
       await fetchInto(key, bust(src!));
     }

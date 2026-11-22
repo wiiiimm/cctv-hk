@@ -64,8 +64,9 @@ export function VideoWall() {
                 selected={!solo && i === selected && !big}
                 large={big}
                 // Live YouTube only (traffic / weather are unaffected): the pinned / full-view video always plays;
-                // previews play muted when AUTOPLAY is on, else show a still + ▶. Only the big video has sound.
-                allowVideo={big || autoplay}
+                // previews play muted when AUTOPLAY is on, else show a still + ▶ — except the selected one, which plays.
+                // Only the big video has sound.
+                allowVideo={big || autoplay || i === selected}
                 muted={muted || !big}
               />
             </div>

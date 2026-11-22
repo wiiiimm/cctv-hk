@@ -48,6 +48,7 @@ function build(): Channel[] {
       regionZh: "太空",
       district: s.place,
       districtZh: s.placeZh,
+      geo: s.lat != null && s.lon != null ? { lat: s.lat, lon: s.lon, approx: true } : undefined,
       refreshMs: 0,
     }),
   );
@@ -63,6 +64,7 @@ function build(): Channel[] {
       regionZh: "新聞",
       district: s.country,
       districtZh: s.countryZh,
+      geo: s.lat != null && s.lon != null ? { lat: s.lat, lon: s.lon, approx: true } : undefined,
       refreshMs: 0,
     }),
   );
@@ -94,6 +96,7 @@ function build(): Channel[] {
       regionZh: "世界",
       district: s.country,
       districtZh: s.countryZh,
+      geo: s.lat != null && s.lon != null ? { lat: s.lat, lon: s.lon, approx: true } : undefined,
       refreshMs: 0,
     }),
   );
@@ -147,7 +150,8 @@ function build(): Channel[] {
 function locate(channels: Channel[]): Channel[] {
   const td = channels.filter((c) => c.kind === "td" && c.geo);
   return channels.map((c) => {
-    if (c.kind === "td" || !c.geo) return c;
+    // Only Hong Kong feeds take the nearest HK district; world / news / space keep their own country / place.
+    if (c.kind === "td" || !c.geo || ["World", "News", "Space"].includes(c.region)) return c;
     let best = td[0];
     let bestD = Infinity;
     for (const t of td) {

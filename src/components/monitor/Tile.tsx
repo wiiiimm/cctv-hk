@@ -78,7 +78,14 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
 
       {noSignal && (
         <div className="tile-nosignal">
-          <span>{snap.status === "offline" ? t.offAir : t.noSignal}</span>
+          {snap.reason === "blocked" ? (
+            <>
+              <span>{t.unavailable}</span>
+              <small>{t.maybeRegion}</small>
+            </>
+          ) : (
+            <span>{snap.status === "offline" ? t.offAir : t.noSignal}</span>
+          )}
         </div>
       )}
       {snap.status === "loading" && (

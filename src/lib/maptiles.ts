@@ -130,3 +130,8 @@ export function pointIn(v: MapView, p: { x: number; y: number }, w: number, h: n
 }
 
 export const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** "22.29550N 114.17220E" / "40.75900N 73.98450W": hemisphere letters instead of minus signs. */
+export function fmtLatLon(lat: number, lon: number, digits = 5): string {
+  return `${Math.abs(lat).toFixed(digits)}${lat < 0 ? "S" : "N"} ${Math.abs(lon).toFixed(digits)}${lon < 0 ? "W" : "E"}`;
+}

@@ -5,7 +5,7 @@ import { DICTS, chAltName, chName } from "../i18n";
 import type { Lang } from "../store";
 import { getSnap } from "../snapshots";
 import type { NewsItem } from "../news";
-import { DARKEN, FLIGHT_MS, flyView, pointIn, reducedMotion, tileImage, tilesForView, viewOf, type MapView } from "../maptiles";
+import { DARKEN, FLIGHT_MS, fmtLatLon, flyView, pointIn, reducedMotion, tileImage, tilesForView, viewOf, type MapView } from "../maptiles";
 import { hkStamp } from "../../hooks/useClock";
 import { arrange, type PinMode } from "../arrange";
 import { ICON_PATHS, type IconName } from "../../components/icons";
@@ -152,13 +152,24 @@ function drawCell(ctx: CanvasRenderingContext2D, key: string, x: number, y: numb
     ctx.fillStyle = ctx.createPattern(noiseTile(), "repeat")!;
     ctx.fillRect(x, y, w, h);
     ctx.restore();
-    const label = snap.status === "loading" ? t.searching : snap.status === "offline" ? t.offAir : t.noSignal;
+    const blocked = snap.reason === "blocked";
+    const label = snap.status === "loading" ? t.searching : blocked ? t.unavailable : snap.status === "offline" ? t.offAir : t.noSignal;
     const fs = Math.min(22, Math.max(13, Math.min(w, h) / k / 9)) * k;
+    const cy = y + h / 2 - (blocked ? fs * 0.5 : 0);
     ctx.fillStyle = "rgba(10,20,120,0.85)";
     ctx.font = `${fs}px ${OSD}`;
     const tw = ctx.measureText(label).width;
-    ctx.fillRect(x + w / 2 - tw / 2 - fs * 0.4, y + h / 2 - fs * 0.6, tw + fs * 0.8, fs * 1.2);
-    text(ctx, label, x + w / 2, y + h / 2 - fs * 0.5, fs, "#ffffff", "center");
+    ctx.fillRect(x + w / 2 - tw / 2 - fs * 0.4, cy - fs * 0.6, tw + fs * 0.8, fs * 1.2);
+    text(ctx, label, x + w / 2, cy - fs * 0.5, fs, "#ffffff", "center");
+    if (blocked) {
+      // Second line: a quiet hint at why ("May be region-restricted").
+      const sf = fs * 0.62;
+      ctx.font = `${sf}px ${OSD}`;
+      const sw = ctx.measureText(t.maybeRegion).width;
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(x + w / 2 - sw / 2 - sf * 0.5, cy + fs * 0.85, sw + sf, sf * 1.3);
+      text(ctx, t.maybeRegion, x + w / 2, cy + fs * 0.85 + sf * 0.12, sf, "#dfe3ea", "center");
+    }
   }
 
   ctx = osd; // everything below is OSD
@@ -253,7 +264,7 @@ function drawMap(ctx: CanvasRenderingContext2D, lat: number, lon: number, approx
   ctx.lineWidth = 2;
   ctx.strokeRect(x, y, w, h);
   const fs = Math.max(12, Math.min(16, h * 0.08));
-  text(ctx, `${lat.toFixed(4)}N ${lon.toFixed(4)}E${approx ? " ≈" : ""}`, x + 6, y + h - fs - 4, fs, "#ffd60a");
+  text(ctx, `${fmtLatLon(lat, lon, 4)}${approx ? " ≈" : ""}`, x + 6, y + h - fs - 4, fs, "#ffd60a");
 }
 
 export interface CellRect {
@@ -464,19 +475,25 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
   if (now - v.presetAt < 2500) text(ctx, v.presetLabel.toUpperCase(), w / 2, h - my - big * 1.8, big * 0.8, "#7CFF6B", "center");
   if (v.patrol) text(ctx, DICTS[v.lang].seq, mx + big * 0.5, h - my - big * 1.3, big * 0.7, "#7CFF6B");
 
-  // Map inset on the pinned video (solo, or the big slot of a pinned layout): top-left, under the channel label.
+  // Map inset on the pinned video (solo, or the big slot of a pinned layout): top-left under the channel label —
+  // or bottom-right on a YouTube video (flat), where it stays clear of the player's own title / controls at the top.
   const pinnedRect = v.single ? rects.get(v.selected) : v.pinned ? rects.get(0) : undefined;
   const pinnedCh = v.single ? active : v.pinned ? CHANNEL_BY_KEY.get(v.cells[0]) : undefined;
   if (pinnedRect && v.showMap && pinnedCh?.geo) {
-    const { x: cellX, y: cellY, w: cellW } = pinnedRect;
+    const { x: cellX, y: cellY, w: cellW, h: cellH } = pinnedRect;
     const mw = Math.round(cellW * 0.18);
     const mh = Math.round(mw * 0.66);
     const fsCap = 18 * v.scale;
-    const mc = osdFor(v.single ? v.selected : 0);
+    const pinCell = v.single ? v.selected : 0;
+    const mc = osdFor(pinCell);
+    const onVideo = pinnedCh.kind === "yt"; // same spot through the power-on / page veil too
     mc.save();
     mc.globalAlpha = 0.65;
-    // Channel label: left edge at cellX + pad (pad = 0.45·fs), bottom ≈ top + 1.8·fs.
-    drawMap(mc, pinnedCh.geo.lat, pinnedCh.geo.lon, pinnedCh.geo.approx, cellX + fsCap * 0.45, cellY + fsCap * 2.2, mw, mh, now);
+    // Top-left: channel label's left edge at cellX + pad (pad = 0.45·fs), bottom ≈ top + 1.8·fs.
+    // Bottom-right (video): inset from the right edge, above the bottom margin (captions sit bottom-left).
+    const mx0 = onVideo ? cellX + cellW - mw - fsCap * 0.6 : cellX + fsCap * 0.45;
+    const my0 = onVideo ? cellY + cellH - mh - fsCap * 0.9 : cellY + fsCap * 2.2;
+    drawMap(mc, pinnedCh.geo.lat, pinnedCh.geo.lon, pinnedCh.geo.approx, mx0, my0, mw, mh, now);
     mc.restore();
   }
   return rects;

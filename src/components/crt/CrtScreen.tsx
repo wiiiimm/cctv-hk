@@ -16,6 +16,10 @@ import { powerThunk, staticBurst } from "../../lib/audio";
 import { PinControls } from "../monitor/PinControls";
 import { useYouTubeErrors } from "../../hooks/useYouTubeErrors";
 
+/** How long the live layers stay hidden: through the power-on sequence, and through a whole-wall static burst. */
+const VEIL_POWER_MS = 1700;
+const VEIL_SWITCH_MS = 900;
+
 /** CSS variables that recreate a picture mode's look on top of a YouTube player. */
 function videoLook(p: CrtPreset): React.CSSProperties {
   const [r, g, b] = p.tint.map((c) => Math.round(Math.min(1, c) * 255));
@@ -37,7 +41,7 @@ function videoLook(p: CrtPreset): React.CSSProperties {
  * CSS version of the current picture mode on top (colour grade, scanlines, mask, vignette, grain, hum bar,
  * flicker, sweep) and a static burst when this tile changes channel. Renders nothing until the stream is live.
  */
-function CrtYouTube({ chKey, rect, muted, big, preset, switchedAt }: { chKey: string; rect: Rect; muted: boolean; big: boolean; preset: CrtPreset; switchedAt: number }) {
+function CrtYouTube({ chKey, rect, muted, big, preset, switchedAt, veiled }: { chKey: string; rect: Rect; muted: boolean; big: boolean; preset: CrtPreset; switchedAt: number; veiled: boolean }) {
   const ch = CHANNEL_BY_KEY.get(chKey);
   const snap = useSnap(ch, big);
   const lang = useStore((s) => s.lang);
@@ -52,7 +56,7 @@ function CrtYouTube({ chKey, rect, muted, big, preset, switchedAt }: { chKey: st
   }, [switchedAt]);
   if (!ch || ch.kind !== "yt" || !snap.live) return null;
   return (
-    <div className={`crt-video${big ? " big" : ""}`} style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ...videoLook(preset) }}>
+    <div className={`crt-video${big ? " big" : ""}${veiled ? " veiled" : ""}`} style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ...videoLook(preset) }}>
       <iframe ref={frameRef} src={youtubeEmbed(ch.code, muted)} title={chName(ch, lang)} allow="autoplay; encrypted-media" referrerPolicy="strict-origin-when-cross-origin" />
       {preset.mono > 0 && <div className="cv-layer cv-glow" />}
       <div className="cv-layer cv-scan" />
@@ -77,8 +81,8 @@ function videoCells(s: { cells: string[]; pinned: boolean; focused: boolean; sel
   const isLiveYt = (key: string) => CHANNEL_BY_KEY.get(key)?.kind === "yt" && !!getSnap(key).live;
   if (s.focused) return isLiveYt(s.cells[s.selected]) ? [s.selected] : [];
   const out: number[] = [];
-  // The pinned video always plays; previews only with AUTOPLAY on (else the canvas draws their still).
-  for (let i = 0; i < Math.min(shown, s.cells.length); i++) if (isLiveYt(s.cells[i]) && (s.autoplay || (s.pinned && i === 0))) out.push(i);
+  // The pinned and the selected video always play; other previews only with AUTOPLAY on (else the canvas draws a still).
+  for (let i = 0; i < Math.min(shown, s.cells.length); i++) if (isLiveYt(s.cells[i]) && (s.autoplay || (s.pinned && i === 0) || i === s.selected)) out.push(i);
   return out;
 }
 
@@ -124,6 +128,11 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   // Latest news for the frame loop (null = ticker off), and whether the ticker is the flat DOM one this frame.
   const newsRef = useRef<NewsItem[] | null>(null);
   const flatRef = useRef(false);
+  // Veil: while the tube powers on (mount / refresh / entering CRT) or the whole wall changes (page, group, preset),
+  // the live layers (YouTube players, flat overlay, flat ticker) are hidden and everything goes through the shader,
+  // so the warm-up / static is seen in full; then the players fade in (they keep loading underneath meanwhile).
+  const [veilUntil, setVeilUntil] = useState(() => Date.now() + VEIL_POWER_MS);
+  const veilRef = useRef(true);
   const [fallback, setFallback] = useState(false);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const cells = useStore((s) => s.cells);
@@ -255,14 +264,14 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
           presetAt,
           patrol: s.patrol,
           // Tiles that play a real YouTube player on top are left blank on the canvas.
-          videoCells: videoCells(s, Number.MAX_SAFE_INTEGER),
-          flatCells: flatCells(s, Number.MAX_SAFE_INTEGER),
+          videoCells: veilRef.current ? [] : videoCells(s, Number.MAX_SAFE_INTEGER),
+          flatCells: veilRef.current ? [] : flatCells(s, Number.MAX_SAFE_INTEGER),
           pinUi: pinButtons(s, hoverRef.current),
           lang: s.lang,
           inset: crtInset(crtCurvature(preset)),
           count: feedCount(s),
           news: newsRef.current,
-          flatTicker: flatRef.current,
+          flatTicker: flatRef.current && !veilRef.current,
           newsH: CRT_NEWS_H,
           aspect: wallAspect(s),
           pinAspect: bigAspect(s),
@@ -330,7 +339,25 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   // One rule for the ticker (lib/crt/flat.ts): it curves unless a flat (YouTube) tile sits in the top row.
   const flat = flatCells({ cells, focused: pin.focused, selected }, rects.length);
   // With CURVE off nothing is warped, so the ticker always goes through the shader (no mismatch possible).
-  const flatTicker = newsOn && curveOn && !tickerCurves(flat, (i) => (pin.focused ? rects[0] : rects[i]), size.h * tubeInset + CRT_NEWS_H);
+  // Whole-wall change (switchedCell -1 with a new switchedAt): veil again for the static burst — but not for a
+  // picture-mode change, which only changes the look (the players stay up).
+  const lastPresetRef = useRef(preset);
+  useEffect(() => {
+    const presetChanged = lastPresetRef.current !== preset;
+    lastPresetRef.current = preset;
+    if (presetChanged) return;
+    if (switchedCell === -1 && switchedAt && Date.now() - switchedAt < 500) setVeilUntil((v) => Math.max(v, switchedAt + VEIL_SWITCH_MS));
+  }, [switchedAt, switchedCell, preset]);
+  const [, lift] = useState(0);
+  useEffect(() => {
+    const left = veilUntil - Date.now();
+    if (left <= 0) return;
+    const tm = setTimeout(() => lift((n) => n + 1), left + 10);
+    return () => clearTimeout(tm);
+  }, [veilUntil]);
+  const veiled = Date.now() < veilUntil;
+  veilRef.current = veiled;
+  const flatTicker = newsOn && curveOn && !veiled && !tickerCurves(flat, (i) => (pin.focused ? rects[0] : rects[i]), size.h * tubeInset + CRT_NEWS_H);
   flatRef.current = flatTicker;
   let controls: { role: "selected" | "pinned" | "solo"; index: number; x: number; y: number; w: number; h: number } | null = null;
   if (rects.length && (selected >= 0 || pin.pinned)) {
@@ -374,10 +401,10 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
         const big = pin.focused || (pin.pinned && i === 0);
         const hit = switchedCell === -1 || switchedCell === i;
         return (
-          <CrtYouTube key={`${cells[i]}-${i}`} chKey={cells[i]} rect={rect} big={big} muted={muted || !big} preset={presetById(preset)} switchedAt={hit ? switchedAt : 0} />
+          <CrtYouTube key={`${cells[i]}-${i}`} chKey={cells[i]} rect={rect} big={big} muted={muted || !big} preset={presetById(preset)} switchedAt={hit ? switchedAt : 0} veiled={veiled} />
         );
       })}
-      <div ref={overHostRef} className="crt-overlay-host" aria-hidden />
+      <div ref={overHostRef} className={`crt-overlay-host${veiled ? " veiled" : ""}`} aria-hidden />
       {flatTicker && size.w > 0 && (
         <NewsTicker
           crt

@@ -65,8 +65,16 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   `lib/crt/flat.ts`: every YouTube tile (live or off air) is flat — players can't be warped — and is drawn, with its
   OSD, on a flat overlay canvas above the players (`drawScreen(..., over)`); the ticker curves (shader) unless a
   YouTube tile is in the top row, then it is a flat DOM strip (`tickerCurves`).
+- YouTube feeds carry estimated positions (`lat`/`lon` in `data/streams.ts`, always approx): the named place, else the
+  broadcaster's base / the country's main city; feeds with no single place (ISS, world rotations) have none. Only HK
+  feeds take the nearest HK district (`locate`); world / news / space keep their country / place. In CRT the map inset
+  sits bottom-right on a YouTube video (top-left otherwise).
+- YouTube off-air reasons (`Snap.reason`): "offair" = not broadcasting (OFF AIR); "blocked" = the owner won't let it
+  play here (UNAVAILABLE + "May be region-restricted").
+- CRT veil: the live layers (players, flat overlay, flat ticker) hide during power-on (mount / refresh / entering CRT)
+  and whole-wall changes (page, group) so the warm-up / static shows, then fade in; picture-mode changes don't veil.
 - AUTOPLAY toggle (`autoplay`, URL `autoplay=0`): off = YouTube previews show a still (refreshed each liveness
-  check) with ▶; the pinned / full-view video always plays (DOM `allowVideo`, CRT `videoCells`).
+  check) with ▶; the pinned / full-view and the selected video always play (DOM `allowVideo`, CRT `videoCells`).
 - CURVE toggle (`crtCurve`, URL `curve=0`): off = every CRT effect but no barrel distortion; `crtCurvature()` returns 0
   (set via `setCrtCurve`, kept in step by CrtScreen), and the ticker always goes through the shader.
   Toggle: NEWS (`news`, URL `news=0`).
