@@ -57,7 +57,11 @@ export const GET: APIRoute = async ({ url }) => {
   if (!conf.liveOnly)
     try {
       const fullPage = conf.replayDays === 0; // non-news: no age limit, a full page of the channel's videos
-      const [feed, page] = await Promise.all([rssVideos(ch), fullPage ? videosPage(ch).catch(() => []) : Promise.resolve([])]);
+      const [feed, page, upcoming] = await Promise.all([
+        rssVideos(ch),
+        fullPage ? videosPage(ch).catch(() => [] as Video[]) : Promise.resolve([] as Video[]),
+        upcomingIds(ch).catch(() => new Set<string>()),
+      ]);
       // Union (the feed has exact dates and recent past streams; the page has ~30 videos), newest first.
       const seen = new Set<string>();
       const all = [...feed, ...page]
@@ -66,6 +70,10 @@ export const GET: APIRoute = async ({ url }) => {
       const match = conf.replayMatch ? new RegExp(conf.replayMatch, "i") : null;
       const exclude = conf.replayExclude ? new RegExp(conf.replayExclude, "i") : null;
       recent = all
+        // Scheduled streams / premieres that haven't started can't play yet: only once they're live (or done). Marks:
+        // the Live tab lists it as upcoming, the Videos page has no "… ago" for it, or the feed shows it with 0 views
+        // (a scheduled premiere / stream has none until it starts).
+        .filter((v) => !upcoming.has(v.id) && !v.upcoming)
         // News: published within the last 48 hours (older → nothing to replay → OFF AIR). replayDays 0 = no limit.
         .filter((v) => fullPage || Date.now() - Date.parse(v.published) <= (conf.replayDays ? conf.replayDays * 86_400_000 : REPLAY_WINDOW_MS))
         .filter((v) => v.id !== videoId && (!match || match.test(v.title)) && !(exclude && exclude.test(v.title)))
@@ -96,14 +104,57 @@ const json = (body: string, maxAge = 60) =>
     },
   });
 
-type Video = { id: string; title: string; published: string };
+type Video = { id: string; title: string; published: string; upcoming?: boolean };
+
+/** Marks of a scheduled stream / premiere in a list item of a channel page. */
+const UPCOMING = /upcomingEventData|"UPCOMING"|Scheduled for|Premieres? |Waiting for|BADGE_STYLE_TYPE_UPCOMING|"style":"UPCOMING"/;
+
+/** IDs of the channel's scheduled (not yet started) streams and premieres, from its Live tab. */
+async function upcomingIds(ch: string): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const data = await channelPageData(ch, "streams");
+  if (!data) return ids;
+  walkItems(data, (id, item) => {
+    if (UPCOMING.test(JSON.stringify(item))) ids.add(id);
+  });
+  return ids;
+}
+
+/** ytInitialData of a channel tab ("videos", "streams"). */
+async function channelPageData(ch: string, tab: string): Promise<unknown | null> {
+  const html = await (
+    await fetch(`https://www.youtube.com/channel/${ch}/${tab}`, {
+      headers: { "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36", "accept-language": "en" },
+      signal: AbortSignal.timeout(8000),
+    })
+  ).text();
+  const m = html.match(/var ytInitialData = (\{[\s\S]*?\});<\/script>/);
+  return m ? JSON.parse(m[1]) : null;
+}
+
+/** Every video list item (lockupViewModel / videoRenderer) in ytInitialData. */
+function walkItems(o: unknown, visit: (id: string, item: Record<string, any>) => void): void {
+  if (Array.isArray(o)) return o.forEach((x) => walkItems(x, visit));
+  if (!o || typeof o !== "object") return;
+  const r = o as Record<string, any>;
+  const item = r.lockupViewModel ?? r.videoRenderer;
+  const id: string | undefined = r.lockupViewModel?.contentId ?? r.videoRenderer?.videoId;
+  if (item && id) return visit(id, item);
+  Object.values(r).forEach((x) => walkItems(x, visit));
+}
 
 /** The channel's official feed: its latest 15 uploads (videos and past streams; never members-only), exact dates. */
 async function rssVideos(ch: string): Promise<Video[]> {
   const xml = await (await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${ch}`, { signal: AbortSignal.timeout(8000) })).text();
-  return [...xml.matchAll(/<entry>[\s\S]*?<yt:videoId>([\w-]{11})<\/yt:videoId>[\s\S]*?<title>([\s\S]*?)<\/title>[\s\S]*?<published>([^<]+)<\/published>/g)].map(
-    ([, id, title, published]) => ({ id, title: decode(title), published }),
-  );
+  return [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].flatMap(([, e]) => {
+    const id = e.match(/<yt:videoId>([\w-]{11})<\/yt:videoId>/)?.[1];
+    const title = e.match(/<title>([\s\S]*?)<\/title>/)?.[1];
+    const published = e.match(/<published>([^<]+)<\/published>/)?.[1];
+    if (!id || title === undefined || !published) return [];
+    // A scheduled premiere / stream sits in the feed with 0 views until it starts.
+    const views = e.match(/<media:statistics views="(\d+)"/)?.[1];
+    return [{ id, title: decode(title), published, upcoming: views === "0" }];
+  });
 }
 
 /**
@@ -132,7 +183,8 @@ async function videosPage(ch: string): Promise<Video[]> {
         const id: string = lockup?.contentId ?? vr.videoId;
         const title: string = lockup?.metadata?.lockupMetadataViewModel?.title?.content ?? (vr?.title?.runs ?? []).map((x: { text: string }) => x.text).join("");
         const ago = s.match(/(\d+) (second|minute|hour|day|week|month|year)s? ago/);
-        if (id && title) out.push({ id, title, published: new Date(Date.now() - agoMs(ago)).toISOString() });
+        // Premieres / scheduled streams have no "… ago" yet (they'd sort as the newest): flagged, then left out.
+        if (id && title) out.push({ id, title, published: new Date(Date.now() - agoMs(ago)).toISOString(), upcoming: UPCOMING.test(s) || !ago });
       }
       return;
     }

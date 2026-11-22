@@ -1,6 +1,6 @@
 import { PinModes, PinToggle, IconButton } from "../PinButtons";
 import { CHANNEL_BY_KEY } from "../../lib/channels";
-import { getSnap } from "../../lib/snapshots";
+import { getSnap, useSnap } from "../../lib/snapshots";
 import { useStore } from "../../lib/store";
 import { useT } from "../../lib/i18n";
 import { ExternalIcon } from "../icons";
@@ -25,6 +25,9 @@ export function openVideoWindow(url: string) {
 export function PinControls({ role, index }: { role: PinRole; index: number }) {
   const t = useT();
   const key = useStore((s) => (role === "solo" ? s.cells[s.selected] : role === "pinned" ? s.cells[0] : undefined));
+  // Re-render when the video id arrives (followed channels / recordings resolve after mount), so the button set
+  // matches the one the CRT paints.
+  useSnap(role === "selected" || !key ? undefined : CHANNEL_BY_KEY.get(key), role !== "selected");
   const url = role === "selected" ? null : pinnedVideoUrl(key);
   return (
     <div className={`pin-controls ${role}`} onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>

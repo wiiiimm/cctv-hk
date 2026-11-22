@@ -281,6 +281,10 @@ const target = (s: State) => (s.selected >= 0 ? s.selected : 0);
 export const ENTRY_TIMEOUT_MS = 1800;
 let entryTimer: ReturnType<typeof setTimeout> | undefined;
 
+/** A click on the selected tile deselects it after this long, unless a double-click (pin) follows. */
+const DBL_CLICK_MS = 280;
+let pendingDeselect: ReturnType<typeof setTimeout> | undefined;
+
 export const actions = {
   /** Preview size (px of tile width). The wall re-fills the screen and reports its new capacity. */
   setPreviewSize(px: number) {
@@ -453,11 +457,15 @@ export const actions = {
   tap(i: number, touch = false) {
     const s = get();
     if (s.focused) return;
+    clearTimeout(pendingDeselect);
     if (s.pinned) {
       if (touch && i === 0) actions.focus(0);
       else actions.pin(i);
     } else if (touch && s.selected === i) actions.pin(i);
-    else actions.select(i);
+    else if (s.selected === i) {
+      // Clicking the selected tile again deselects it — unless it turns out to be a double-click (escalate cancels).
+      pendingDeselect = setTimeout(() => get().selected === i && !get().pinned && actions.deselect(), DBL_CLICK_MS);
+    } else actions.select(i);
   },
   select(i: number) {
     update((s) => ({ selected: Math.max(0, Math.min(s.cells.length - 1, i)) }));
@@ -494,6 +502,7 @@ export const actions = {
   },
   /** One pin level up for video `i`: grid → pinned → solo. Picking another video while pinned pins that one. */
   escalate(i?: number) {
+    clearTimeout(pendingDeselect);
     const s = get();
     const at = i ?? s.selected;
     if (at < 0) return;

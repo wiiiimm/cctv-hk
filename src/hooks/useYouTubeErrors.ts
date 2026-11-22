@@ -19,6 +19,7 @@ const NOT_STARTED = new Set([-1, 2, 5]);
  */
 export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, channelKey: string, enabled = true, sound = false, live = false) {
   const soundRef = useRef(sound);
+  const startedRef = useRef(false);
   const send = useRef<(func: string, args?: unknown[]) => void>(() => {});
 
   useEffect(() => {
@@ -40,22 +41,26 @@ export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, chann
     let atEdge = !live;
     let unmutedAt = 0;
     let soundBlocked = false;
+    // Sound only once it's actually playing: browsers refuse to *start* a video with sound before the first click /
+    // key press on the page (a fresh load with sound on would otherwise never start), but usually allow unmuting one
+    // that is already playing.
+    let started = false;
     const applySound = () => {
-      if (soundRef.current && !soundBlocked) {
+      if (soundRef.current && !soundBlocked && started) {
         command("unMute");
         command("setVolume", [100]);
         unmutedAt = Date.now();
       } else command("mute");
     };
     const kick = () => {
+      command("mute");
       command("playVideo");
-      applySound();
     };
-    // Keep nudging a player that hasn't started (or got paused) — but only a few times.
+    // Keep nudging a player that hasn't started (or got paused) — muted, so the browser lets it start; a few times.
     const nudge = setInterval(() => {
       if (!ready || state === PLAYING || state === 3 || nudges >= 6) return;
       nudges++;
-      if (soundBlocked) command("mute");
+      command("mute");
       command("playVideo");
     }, 1500);
     // A user gesture lets the browser allow sound again.
@@ -97,6 +102,10 @@ export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, chann
       }
       if (next === PLAYING) {
         nudges = 0;
+        if (!started) {
+          started = startedRef.current = true;
+          applySound(); // now that it plays, give it sound if it should have it
+        }
         if (!atEdge) {
           atEdge = true;
           command("seekTo", [1e9, true]);
@@ -105,6 +114,7 @@ export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, chann
       state = next;
       if (NOT_STARTED.has(next) && nudges === 0) {
         nudges = 1;
+        if (!started) command("mute");
         command("playVideo");
       }
     };
@@ -114,6 +124,7 @@ export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, chann
       ready = false;
       state = undefined;
       nudges = 0;
+      started = startedRef.current = false;
       atEdge = !live;
       hello();
     };
@@ -132,6 +143,8 @@ export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, chann
   // Sound on / off (pin, unpin, mute toggle) without reloading the player.
   useEffect(() => {
     soundRef.current = sound;
+    // Not playing yet: it gets its sound when it starts (unmuting first could stop it from starting).
+    if (sound && !startedRef.current) return;
     if (sound) {
       send.current("unMute");
       send.current("setVolume", [100]);

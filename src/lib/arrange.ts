@@ -263,7 +263,9 @@ function wideLayout(w: number, h: number, p: number, gap: number, flex: number, 
   // Picture-left when a full-width picture would leave less than one decent preview row, or the stage is very wide.
   const besideW = Math.min(fullH * pinAspect, w * 0.72);
   const tooShort = h - gap * 3 - Math.min(fullW / pinAspect, h * 0.6) < minPrevH;
-  if ((w / h > 1.5 || tooShort) && w - besideW - gap * 3 >= Math.min(p, w * 0.22)) {
+  // Only genuinely wide-and-short stages (ultra-wide, landscape phones) — a normal landscape screen keeps the previews
+  // below as the "wide" mode promises.
+  if ((w / h > 2.2 || tooShort) && w - besideW - gap * 3 >= Math.min(p, w * 0.22)) {
     const bigW = besideW;
     const rx = gap + bigW;
     const rest = fillBox(rx, 0, w - rx, h, p, gap, flex, aspect);

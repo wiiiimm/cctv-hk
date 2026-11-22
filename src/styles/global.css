@@ -383,6 +383,9 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .tile:hover .pin-controls, .crt-pin-anchor:hover .pin-controls, .pin-controls:focus-within { opacity: 1; }
 .crt-pin-anchor { position: absolute; z-index: 4; pointer-events: none; }
 .crt-pin-anchor .pin-controls { pointer-events: auto; }
+/* In CRT the visible buttons are painted by the compositor at 34px from the tile's bottom (drawPinUi); the invisible
+   real buttons must sit exactly there, for every role. */
+.crt-pin-anchor .pin-controls.pinned, .crt-pin-anchor .pin-controls.solo { bottom: 34px; }
 .crt-tube:hover .crt-pin-anchor .pin-controls { opacity: 1; }
 .crt-video.big .crt-video-osd { font-size: 17px; }
 .crt-video:not(.big) .crt-video-osd { bottom: auto; top: 6px; font-size: 14px; }

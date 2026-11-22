@@ -434,7 +434,9 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
           <CrtYouTube key={`${cells[i]}-${i}`} chKey={cells[i]} rect={rect} big={big} preview={!big && i !== selected} muted={muted || !(big || (!pin.pinned && !pin.focused && i === selected))} preset={presetById(preset)} switchedAt={hit ? switchedAt : 0} veiled={veiled} />
         );
       })}
-      <div ref={overHostRef} className={`crt-overlay-host${veiled ? " veiled" : ""}`} aria-hidden />
+      {/* The flat overlay (YouTube stills, off-air screens and their OSD) gets the picture mode's colour treatment too —
+          black-and-white, phosphor tint… — like the players (.crt-video iframe) and the shader-drawn tiles. */}
+      <div ref={overHostRef} className={`crt-overlay-host${veiled ? " veiled" : ""}`} style={{ filter: videoFilter(presetById(preset)) }} aria-hidden />
       {flatTicker && size.w > 0 && (
         <NewsTicker
           crt
