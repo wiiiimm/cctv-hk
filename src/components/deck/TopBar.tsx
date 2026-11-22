@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { actions, useStore, type PatrolMode } from "../../lib/store";
+import { actions, store, useStore, type PatrolMode } from "../../lib/store";
+import { viewLink } from "../../lib/urlState";
 import { PRESETS } from "../../lib/crt/presets";
 import { PREVIEW_MAX, PREVIEW_MIN, PREVIEW_STEP } from "../../lib/arrange";
 import { useT } from "../../lib/i18n";
@@ -113,6 +114,30 @@ function LangToggle() {
   );
 }
 
+/** Share this exact view: the system share sheet on phones, else copy the link. */
+function ShareButton() {
+  const t = useT();
+  const [done, setDone] = useState(false);
+  const share = async () => {
+    const url = viewLink(store.get());
+    try {
+      if (navigator.share && matchMedia("(hover: none)").matches) await navigator.share({ title: document.title, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        setDone(true);
+        setTimeout(() => setDone(false), 1600);
+      }
+    } catch {
+      /* share cancelled */
+    }
+  };
+  return (
+    <button type="button" className={`pill share${done ? " on" : ""}`} onClick={share} title={t.shareView}>
+      {done ? t.linkCopied : t.share}
+    </button>
+  );
+}
+
 function Clock() {
   const t = useT();
   const now = useClock();
@@ -168,6 +193,7 @@ function MorePanel({ onClose }: { onClose: () => void }) {
         <div className="tb-group">
           <SoundToggle />
           <LangToggle />
+          <ShareButton />
         </div>
         <Clock />
       </div>
@@ -233,6 +259,7 @@ export function TopBar({ onGuide, sidebarShown = true }: { onGuide: () => void; 
           <div className="tb-group">
             <SoundToggle />
             <LangToggle />
+            <ShareButton />
           </div>
           <Clock />
         </>

@@ -117,15 +117,23 @@ export function useControls() {
   // manual change, so a manual change always gets a full dwell before the sequence moves on.
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
-    const interval = () => {
+    // Rolling never swaps more often than every 800ms; when (dwell / previews) is shorter, each tick swaps several
+    // previews instead, so every preview still changes exactly once per dwell.
+    const MIN_TICK = 800;
+    const plan = () => {
       const s = store.get();
-      const previews = Math.max(1, s.cells.length - (s.pinned ? 1 : 0));
       const ms = s.patrolSec * 1000;
-      return s.patrolMode === "rolling" ? Math.max(800, ms / previews) : ms;
+      if (s.patrolMode !== "rolling") return { every: ms, swaps: 1 };
+      const previews = Math.max(1, s.cells.length - (s.pinned ? 1 : 0));
+      const per = ms / previews;
+      const swaps = Math.max(1, Math.ceil(MIN_TICK / per));
+      return { every: per * swaps, swaps };
     };
     const arm = () => {
       clearInterval(timer);
-      if (store.get().patrol) timer = setInterval(() => actions.sequenceTick(), interval());
+      if (!store.get().patrol) return;
+      const { every, swaps } = plan();
+      timer = setInterval(() => actions.sequenceTick(swaps), every);
     };
     const sig = (s: ReturnType<typeof store.get>) => `${s.patrol}:${s.patrolSec}:${s.patrolMode}:${s.cells.length}:${s.pinned}`;
     let last = sig(store.get());

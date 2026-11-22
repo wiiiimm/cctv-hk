@@ -37,6 +37,9 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   down a pin level, long-press selects + opens the details, pinch sets preview size. `actions.tap`: on touch, tapping
   the selected preview pins it and tapping the pinned video goes full; finger double-taps are ignored. Landscape phone
   full view hides the top bar after 3s.
+- The view is in the URL (`lib/urlState.ts`): every control round-trips through the query string (`encodeView` /
+  `applyView`), kept in step with `replaceState`; a link overrides saved state on load. Cameras are channel numbers;
+  a custom group / favourites travel as `gc` + `gn` and are added to the receiver's groups. SHARE copies / shares it.
 - No right sidebar. The selected (or pinned) video's details + map sit at the top of the left sidebar
   (`components/deck/Sidebar.tsx`), above the channel guide. Theatre mode (`T`) hides the whole sidebar.
 - Camera groups (`buildGroups` in `lib/channels.ts`): feed types, topic groups (`TOPICS`: curated keys + TD-name regex /

@@ -1,6 +1,7 @@
 // App state for the viewing engine. The console UI and the CRT shell both read and drive this one store.
 import { useSyncExternalStore } from "react";
 import { CHANNELS, CHANNEL_BY_KEY, CHANNEL_BY_NUM, GROUP_BY_ID, feedAspect } from "./channels";
+import { applyView, syncUrl } from "./urlState";
 import { PREVIEW_DEFAULT, PREVIEW_MAX, PREVIEW_MIN, PREVIEW_STEP, liveGeometry, neighbour, type PinMode } from "./arrange";
 
 export type Mode = "console" | "crt";
@@ -87,8 +88,9 @@ function initial(): State {
     focused: false,
     groupId: "featured",
     page: 0,
-    patrol: false,
-    patrolSec: 15,
+    // Patrol runs by default: rolling, one preview swapped every 10s.
+    patrol: true,
+    patrolSec: 10,
     patrolMode: "rolling",
     mode: "console",
     crtPreset: "trinitron",
@@ -107,6 +109,9 @@ function initial(): State {
   } catch {
     /* storage unavailable: use defaults */
   }
+  // A shared link wins over what this device saved (then goes through the same clean-up below).
+  const shared = typeof window !== "undefined" ? applyView(base, window.location.search) : {};
+  const fromLink = typeof window !== "undefined" && window.location.search.length > 1;
   base.favourites = base.favourites.filter((k) => CHANNEL_BY_KEY.has(k));
   base.customGroups = (Array.isArray(base.customGroups) ? base.customGroups : [])
     .filter((g) => g && typeof g.id === "string" && typeof g.name === "string")
@@ -126,6 +131,8 @@ function initial(): State {
   if (!pinnedKey) base.pinned = base.focused = false;
   // Until the wall reports how many previews fit, start with a screenful's worth from the group.
   if (base.cells.length < 2) base.cells = [...base.cells, ...pageCells(groupKeys(base), base.page, 12).filter((k) => k !== pinnedKey)];
+  // Selection from a link is by camera; without one, a link means "nothing selected" (or the pinned video).
+  if (fromLink) base.selected = shared.select ? base.cells.indexOf(shared.select) : base.pinned ? 0 : -1;
   return base;
 }
 
@@ -133,7 +140,10 @@ let state: State | null = null;
 const listeners = new Set<() => void>();
 
 function get(): State {
-  if (!state) state = initial();
+  if (!state) {
+    state = initial();
+    syncUrl(state);
+  }
   return state;
 }
 
@@ -147,6 +157,7 @@ function update(patch: Partial<State> | ((s: State) => Partial<State>)) {
   } catch {
     /* ignore */
   }
+  syncUrl(state);
   listeners.forEach((l) => l());
 }
 
@@ -494,7 +505,8 @@ export const actions = {
     update({ patrolMode });
   },
   /** One sequence (patrol) step, per the current mode. Does nothing when the whole group is already on screen. */
-  sequenceTick() {
+  /** One step of the sequence (patrol). Rolling swaps `swaps` previews (see the timer in useControls). */
+  sequenceTick(swaps = 1) {
     const s = get();
     const keys = groupKeys(s);
     const fixed = s.pinned ? 1 : 0;
@@ -526,19 +538,27 @@ export const actions = {
     // Rolling: replace the next preview slot (round-robin) with the next camera that isn't on screen.
     update((st) => {
       const cells = [...st.cells];
-      const slot = fixed + (rollSlot++ % Math.max(1, cells.length - fixed));
       const onScreen = new Set(cells);
-      let pick: string | undefined;
-      for (let k = 0; k < pool.length && !pick; k++) {
-        const key = pool[(rollCursor + k) % pool.length];
-        if (!onScreen.has(key)) {
-          pick = key;
-          rollCursor = (rollCursor + k + 1) % pool.length;
+      let lastSlot = -1;
+      for (let n = 0; n < Math.min(swaps, cells.length - fixed); n++) {
+        const slot = fixed + (rollSlot++ % Math.max(1, cells.length - fixed));
+        let pick: string | undefined;
+        for (let k = 0; k < pool.length && !pick; k++) {
+          const key = pool[(rollCursor + k) % pool.length];
+          if (!onScreen.has(key)) {
+            pick = key;
+            rollCursor = (rollCursor + k + 1) % pool.length;
+          }
         }
+        if (!pick || slot >= cells.length) break;
+        onScreen.delete(cells[slot]);
+        onScreen.add(pick);
+        cells[slot] = pick;
+        lastSlot = slot;
       }
-      if (!pick || slot >= cells.length) return {};
-      cells[slot] = pick;
-      return { cells, switchedAt: (lastTick = Date.now()), switchedCell: slot };
+      if (lastSlot < 0) return {};
+      // Static stays confined to a frame (never the whole tube) even when several swap at once.
+      return { cells, switchedAt: (lastTick = Date.now()), switchedCell: lastSlot };
     });
   },
   togglePatrol() {
