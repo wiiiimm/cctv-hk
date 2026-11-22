@@ -1,4 +1,6 @@
 import { memo, useRef } from "react";
+import { TileMap } from "../MiniMap";
+import { usePlayerSlot } from "../../hooks/usePlayerSlot";
 import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed } from "../../lib/channels";
 import { useSnap } from "../../lib/snapshots";
 import { actions, store, useStore } from "../../lib/store";
@@ -17,23 +19,28 @@ interface Props {
   selected: boolean;
   large: boolean;
   allowVideo: boolean;
+  /** Draw the map inset on this (pinned / full-view) tile — when the sidebar with its map is hidden. */
+  mapOnTile?: boolean;
   muted: boolean;
 }
 
-export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, large, allowVideo, muted }: Props) {
+export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, large, allowVideo, muted, mapOnTile = false }: Props) {
   const ch = CHANNEL_BY_KEY.get(channelKey);
   const snap = useSnap(ch, large);
   const now = useClock();
   const t = useT();
   const lang = useStore((s) => s.lang);
+  const showMap = useStore((s) => s.showMap);
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const willPlay = ch?.kind === "yt" && !ch.noEmbed && allowVideo && !!snap.live;
+  // Previews (not the pinned / full-view or selected video) start one after another and play at reduced quality.
+  const preview = !large && !selected;
+  const willPlay = usePlayerSlot(ch?.kind === "yt" && !ch.noEmbed && allowVideo && !!snap.live, preview, `${channelKey}|${snap.videoId ?? ""}`);
   // Players load muted (autoplay is allowed); the hook starts playback and unmutes the one that should have sound.
   useYouTubeErrors(frameRef, channelKey, willPlay, !muted);
   if (!ch) return <div className="tile" />;
 
   const isVideo = ch.kind === "yt";
-  const playing = isVideo && !ch.noEmbed && allowVideo && snap.live;
+  const playing = willPlay;
   const noSignal = snap.status === "error" || snap.status === "offline";
   const stale = !isVideo && snap.takenAt && now - snap.takenAt > ch.refreshMs * 3;
   // Recording slots show the recording's own title, with the slot name ("無綫新聞 重溫 1") as the second line.
@@ -67,7 +74,7 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
       {playing ? (
         <iframe
           ref={frameRef}
-          className="tile-media"
+          className={`tile-media${preview ? " lowq" : ""}`}
           src={youtubeEmbed(snap.videoId ?? ch.code, true, snap.replay ? snap.playlist : undefined)}
           title={name}
           allow="autoplay; encrypted-media; picture-in-picture"
@@ -140,6 +147,7 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
           {t.watchOnYouTube}
         </a>
       )}
+      {large && mapOnTile && showMap && ch.geo && <TileMap lat={ch.geo.lat} lon={ch.geo.lon} approx={ch.geo.approx} video={isVideo} />}
       {pinRole && <PinControls role={pinRole} index={index} />}
       {/* Selection indicator: drawn above the picture (an outline on the tile itself sits underneath it). */}
       {selected && (

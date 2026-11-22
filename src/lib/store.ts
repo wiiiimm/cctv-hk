@@ -53,6 +53,8 @@ export interface State {
   /** User-made groups; a feed can be in any number of them. Selected as groupId "custom:<id>". */
   customGroups: CustomGroup[];
   showMap: boolean;
+  /** The map inset on the pinned video folded down to a small box (click the map to toggle). */
+  mapMini: boolean;
   muted: boolean;
   /** News ticker bar (HKO warnings, TD traffic news, RTHK headlines). */
   news: boolean;
@@ -73,7 +75,7 @@ export interface State {
 }
 
 const STORAGE_KEY = "cctv-hk:v1";
-const PERSIST: (keyof State)[] = ["previewSize", "pinMode", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "customGroups", "patrolSec", "patrolMode", "muted", "news", "crtCurve", "autoplay"];
+const PERSIST: (keyof State)[] = ["previewSize", "pinMode", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "customGroups", "patrolSec", "patrolMode", "muted", "news", "crtCurve", "autoplay", "mapMini"];
 
 function groupKeys(s: Pick<State, "groupId" | "favourites" | "customGroups"> & { here?: Here | null }): string[] {
   // Near me before the location is known: the featured line-up until it arrives.
@@ -113,6 +115,7 @@ function initial(): State {
     favourites: [],
     customGroups: [],
     showMap: true,
+    mapMini: false,
     muted: true,
     news: true,
     crtCurve: true,
@@ -624,6 +627,9 @@ export const actions = {
   },
   toggleMap() {
     update((s) => ({ showMap: !s.showMap }));
+  },
+  toggleMapMini() {
+    update((s) => ({ mapMini: !s.mapMini }));
   },
   toggleMute() {
     update((s) => ({ muted: !s.muted }));

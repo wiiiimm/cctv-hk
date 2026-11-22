@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { usePlayerSlot } from "../../hooks/usePlayerSlot";
 import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed, MAX_PLAYING_PREVIEWS } from "../../lib/channels";
 import { getSnap, retain, useSnap } from "../../lib/snapshots";
 import { lastTouchAt } from "../../hooks/useWallGestures";
@@ -6,7 +7,7 @@ import { CRT_NEWS_H, useNews, type NewsItem } from "../../lib/news";
 import { NewsTicker } from "../deck/NewsTicker";
 import { flatCells, tickerCurves } from "../../lib/crt/flat";
 import { actions, bigAspect, feedCount, isPatrolSwitch, store, useStore, wallAspect } from "../../lib/store";
-import { drawScreen } from "../../lib/crt/compositor";
+import { drawScreen, mapInsetRect } from "../../lib/crt/compositor";
 import { arrange, publishGeometry, type PinMode, type Rect } from "../../lib/arrange";
 import { CrtRenderer, ON, powerOff, powerOn, unwarp } from "../../lib/crt/renderer";
 import { crtCurvature, crtInset, presetById, setCrtCurve, videoFilter, type CrtPreset } from "../../lib/crt/presets";
@@ -41,12 +42,14 @@ function videoLook(p: CrtPreset): React.CSSProperties {
  * CSS version of the current picture mode on top (colour grade, scanlines, mask, vignette, grain, hum bar,
  * flicker, sweep) and a static burst when this tile changes channel. Renders nothing until the stream is live.
  */
-function CrtYouTube({ chKey, rect, muted, big, preset, switchedAt, veiled }: { chKey: string; rect: Rect; muted: boolean; big: boolean; preset: CrtPreset; switchedAt: number; veiled: boolean }) {
+function CrtYouTube({ chKey, rect, muted, big, preview, preset, switchedAt, veiled }: { chKey: string; rect: Rect; muted: boolean; big: boolean; preview: boolean; preset: CrtPreset; switchedAt: number; veiled: boolean }) {
   const ch = CHANNEL_BY_KEY.get(chKey);
   const snap = useSnap(ch, big);
   const lang = useStore((s) => s.lang);
   const frameRef = useRef<HTMLIFrameElement>(null);
-  useYouTubeErrors(frameRef, chKey, !!ch && ch.kind === "yt" && !!snap.live, !muted);
+  // Previews take turns to start and play at reduced quality (see usePlayerSlot / .lowq).
+  const play = usePlayerSlot(!!ch && ch.kind === "yt" && !!snap.live, preview, `${chKey}|${snap.videoId ?? ""}`);
+  useYouTubeErrors(frameRef, chKey, play, !muted);
   const [burst, setBurst] = useState(false);
   useEffect(() => {
     if (!switchedAt || Date.now() - switchedAt > 400) return;
@@ -54,9 +57,9 @@ function CrtYouTube({ chKey, rect, muted, big, preset, switchedAt, veiled }: { c
     const tm = setTimeout(() => setBurst(false), 280);
     return () => clearTimeout(tm);
   }, [switchedAt]);
-  if (!ch || ch.kind !== "yt" || !snap.live) return null;
+  if (!ch || ch.kind !== "yt" || !play) return null;
   return (
-    <div className={`crt-video${big ? " big" : ""}${veiled ? " veiled" : ""}`} style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ...videoLook(preset) }}>
+    <div className={`crt-video${big ? " big" : ""}${preview ? " lowq" : ""}${veiled ? " veiled" : ""}`} style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ...videoLook(preset) }}>
       <iframe ref={frameRef} src={youtubeEmbed(snap.videoId ?? ch.code, true, snap.replay ? snap.playlist : undefined)} title={chName(ch, lang)} allow="autoplay; encrypted-media" referrerPolicy="strict-origin-when-cross-origin" />
       {preset.mono > 0 && <div className="cv-layer cv-glow" />}
       <div className="cv-layer cv-scan" />
@@ -274,6 +277,7 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
           switchedAt: s.switchedAt,
           switchedCell: s.switchedCell,
           showMap: s.showMap,
+          mapMini: s.mapMini,
           presetLabel: s.lang === "zh" ? preset.labelZh : preset.label,
           presetAt,
           patrol: s.patrol,
@@ -321,13 +325,19 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
     const touch = Date.now() - lastTouchAt < 800;
     if (dbl && touch) return; // touch steps with second taps instead
     const s = store.get();
+    const r = e.currentTarget.getBoundingClientRect();
+    const px = e.clientX - r.left;
+    const py = e.clientY - r.top;
+    // The map inset on the pinned video: a click folds it to a small box, another click unfolds it.
+    const m = mapInsetRect();
+    if (m && px >= m.x && px < m.x + m.w && py >= m.y && py < m.y + m.h) {
+      if (!dbl) actions.toggleMapMini();
+      return;
+    }
     if (s.focused) {
       if (dbl) actions.unfocus();
       return;
     }
-    const r = e.currentTarget.getBoundingClientRect();
-    const px = e.clientX - r.left;
-    const py = e.clientY - r.top;
     const i = crtLayout(r.width, r.height, { ...s, count: feedCount(s), aspect: wallAspect(s), pinAspect: bigAspect(s), news: s.news }).rects.findIndex((q) => px >= q.x && px < q.x + q.w && py >= q.y && py < q.y + q.h);
     if (i < 0) {
       if (!dbl) actions.deselect(); // empty part of the tube
@@ -418,7 +428,7 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
         // Static burst on a YouTube tile: whole-wall change, its own retune, or a preview when the previews paged.
         const hit = switchedCell === -1 || switchedCell === i || (switchedCell === -2 && !(pin.pinned && i === 0));
         return (
-          <CrtYouTube key={`${cells[i]}-${i}`} chKey={cells[i]} rect={rect} big={big} muted={muted || !(big || (!pin.pinned && !pin.focused && i === selected))} preset={presetById(preset)} switchedAt={hit ? switchedAt : 0} veiled={veiled} />
+          <CrtYouTube key={`${cells[i]}-${i}`} chKey={cells[i]} rect={rect} big={big} preview={!big && i !== selected} muted={muted || !(big || (!pin.pinned && !pin.focused && i === selected))} preset={presetById(preset)} switchedAt={hit ? switchedAt : 0} veiled={veiled} />
         );
       })}
       <div ref={overHostRef} className={`crt-overlay-host${veiled ? " veiled" : ""}`} aria-hidden />

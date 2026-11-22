@@ -25,6 +25,8 @@ export interface ScreenView {
   /** Cell hit by the last change (-1 = whole screen). */
   switchedCell: number;
   showMap: boolean;
+  /** Map inset folded to a small box. */
+  mapMini?: boolean;
   presetLabel: string;
   presetAt: number;
   patrol: boolean;
@@ -220,7 +222,7 @@ function drawCell(ctx: CanvasRenderingContext2D, key: string, x: number, y: numb
 let mapFlight: { from: MapView; to: MapView; t0: number } | null = null;
 let mapShown: MapView | null = null;
 
-function drawMap(ctx: CanvasRenderingContext2D, lat: number, lon: number, approx: boolean, x: number, y: number, w: number, h: number, now: number) {
+function drawMap(ctx: CanvasRenderingContext2D, lat: number, lon: number, approx: boolean, x: number, y: number, w: number, h: number, now: number, label = true) {
   const target = viewOf(lat, lon, approx ? 14 : 16);
   const same = (p: MapView | null) => !!p && p.x === target.x && p.y === target.y && p.z === target.z;
   if (!same(mapFlight?.to ?? null)) mapFlight = { from: mapShown && !reducedMotion() ? mapShown : target, to: target, t0: now };
@@ -267,6 +269,7 @@ function drawMap(ctx: CanvasRenderingContext2D, lat: number, lon: number, approx
   ctx.strokeStyle = "rgba(255,255,255,0.8)";
   ctx.lineWidth = 2;
   ctx.strokeRect(x, y, w, h);
+  if (!label) return; // folded box: map + pin only
   const fs = Math.max(12, Math.min(16, h * 0.08));
   text(ctx, `${fmtLatLon(lat, lon, 4)}${approx ? " ≈" : ""}`, x + 6, y + h - fs - 4, fs, "#ffd60a");
 }
@@ -423,6 +426,11 @@ function drawTicker(ctx: CanvasRenderingContext2D, items: NewsItem[], lang: Lang
   ctx.restore();
 }
 
+/** Where the map inset was last drawn (CSS px of the tube), so a click on it can fold / unfold it. */
+let mapHit: { x: number; y: number; w: number; h: number } | null = null;
+export const mapInsetRect = () => mapHit;
+if (import.meta.env.DEV) (globalThis as unknown as { __crtMapRect: typeof mapInsetRect }).__crtMapRect = mapInsetRect; // dev / test aid
+
 /** Draws the screen and returns each visible cell's rectangle (by cell index) in canvas pixels. */
 /**
  * Draws the screen into `ctx` (which goes through the shader). `over` is an optional flat canvas layered above the
@@ -519,9 +527,10 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
   // or bottom-right on a YouTube video (flat), where it stays clear of the player's own title / controls at the top.
   const pinnedRect = v.single ? rects.get(v.selected) : v.pinned ? rects.get(0) : undefined;
   const pinnedCh = v.single ? active : v.pinned ? CHANNEL_BY_KEY.get(v.cells[0]) : undefined;
+  mapHit = null;
   if (pinnedRect && v.showMap && pinnedCh?.geo) {
     const { x: cellX, y: cellY, w: cellW, h: cellH } = pinnedRect;
-    const mw = Math.round(cellW * 0.18);
+    const mw = Math.round(v.mapMini ? Math.min(80 * v.scale, cellW * 0.18) : cellW * 0.18);
     const mh = Math.round(mw * 0.66);
     const fsCap = 18 * v.scale;
     const pinCell = v.single ? v.selected : 0;
@@ -530,11 +539,14 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
     mc.save();
     mc.globalAlpha = 0.65;
     // Top-left: channel label's left edge at cellX + pad (pad = 0.45·fs), bottom ≈ top + 1.8·fs.
-    // Bottom-right (video): inset from the right edge, above the bottom margin (captions sit bottom-left).
-    const mx0 = onVideo ? cellX + cellW - mw - fsCap * 0.6 : cellX + fsCap * 0.45;
-    const my0 = onVideo ? cellY + cellH - mh - fsCap * 0.9 : cellY + fsCap * 2.2;
-    drawMap(mc, pinnedCh.geo.lat, pinnedCh.geo.lon, pinnedCh.geo.approx, mx0, my0, mw, mh, now);
+    // Bottom-right (video): right-aligned with the pin / watch-mode buttons and just above their row (see drawPinUi:
+    // the row's top is 34 + BTN_H above the cell's bottom), so it never covers them.
+    const k = v.scale;
+    const mx0 = onVideo ? cellX + cellW - mw - 8 * k : cellX + fsCap * 0.45;
+    const my0 = onVideo ? cellY + cellH - mh - (34 + BTN_H + 6) * k : cellY + fsCap * 2.2;
+    drawMap(mc, pinnedCh.geo.lat, pinnedCh.geo.lon, pinnedCh.geo.approx, mx0, my0, mw, mh, now, !v.mapMini);
     mc.restore();
+    mapHit = { x: mx0 / v.scale, y: my0 / v.scale, w: mw / v.scale, h: mh / v.scale };
   }
   return rects;
 }

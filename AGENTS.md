@@ -20,6 +20,12 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   CRT click mapping and arrow-key navigation via `publishGeometry`/`neighbour`). The user sets a **preview size**
   (`previewSize`, px of tile width; slider / L, Shift+L); the wall shows as many 4:3 previews as fit and reports that
   capacity back (`actions.setCapacity`), so paging / patrol move by one screenful.
+- **Hard cap: 16 previews per screen** (`MAX_PREVIEWS` in `lib/arrange.ts`, plus the pinned video). Over it, the
+  unpinned wall takes the ≤16-cell grid covering the most of the stage (`cappedGrid`); pinned layouts enlarge the
+  previews in small steps ("side" falls back to "wide" on tall phones). Every preview on screen may then autoplay
+  (`MAX_PLAYING_PREVIEWS` = 16): preview players start one by one (`hooks/usePlayerSlot.ts`, ~450 ms apart, to avoid
+  YouTube refusing a burst) and play at reduced quality — YouTube picks quality from player size, so `.lowq` lays the
+  preview player out at half size and scales it ×2. Pinned / full-view / selected players are full size.
 - Pin levels: previews → pinned → full (`focused`). Pinned has a size, `pinMode`: "side" (block top-left, previews right
   + below — the classic 1+N) or "wide" (block as wide as fits, previews either side + below). Previews and the pinned
   block share one regular grid so every preview is the same size and aligned. Enter/double-click step up, Esc down;
@@ -106,6 +112,14 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   Toggle: NEWS (`news`, URL `news=0`).
 - Maps fly between locations (`flyView` / `tilesForView` in `lib/maptiles.ts`, used by `MiniMap` and the CRT map
   inset): pan for short hops, zoom out–pan–in for long ones; the pin rides with the map.
+- Map inset on the pinned / full-view feed: CRT always (top-left, or bottom-right just above the pin buttons on a
+  YouTube video); the DOM wall shows it (`TileMap` in `components/MiniMap.tsx`) when the sidebar is hidden (theatre,
+  or ≤1180px). A click folds it to an 80px box and back (`mapMini`, persisted, shared by both; CRT hit-test via
+  `mapInsetRect`).
+- Himawari satellite channels 255–258 (in Live data and "Hong Kong weather / 香港天氣", the renamed `kind:hko` group):
+  255 JMA true colour, tiles stitched client-side (`lib/satellite.ts`, CORS open); 256–258 NASA GIBS WMS (IR / air
+  mass + coastlines, `{gibsTime}` ≈ now − 40 min; a missing or not-yet-published slot — XML error or mostly black —
+  steps back 10 min).
 - Live data (`data/live-data.ts`, group "Live data / 實時數據"): HKO radar 64/128/256 km (251–253) and the global
   satellite image (254) via `/api/snap?hko=RAD064|RAD128|RAD256|SATASIA` (the relay finds the newest time-named image,
   stepping back); TD speed-map panels (261–265) loaded directly via `Channel.src` (`{lang}` → tc / en). Radar / satellite are also in

@@ -2,7 +2,9 @@
 // one poller per key fetches the picture as a blob so the DOM can show an object URL and the CRT
 // renderer can upload an ImageBitmap to WebGL without tainting the canvas.
 import { useEffect, useSyncExternalStore } from "react";
-import { CHANNEL_BY_KEY, snapshotUrl, type Channel } from "./channels";
+import { CHANNEL_BY_KEY, gibsTime, snapshotUrl, type Channel } from "./channels";
+import { store } from "./store";
+import { jmaPicture } from "./satellite";
 
 export type SnapStatus = "loading" | "ok" | "error" | "offline";
 
@@ -109,7 +111,7 @@ async function load(key: string) {
   const e = entries.get(key);
   const ch = CHANNEL_BY_KEY.get(key);
   if (!e || !ch) return;
-  const src = snapshotUrl(ch, e.hd);
+  const src = snapshotUrl(ch, e.hd, store.get().lang);
   // Followed channels (bulletins / replays) are re-checked every minute so a stream starting / ending shows promptly.
   let next: number = ch.follow ? 60_000 : POLL_MS[ch.kind];
   try {
@@ -167,6 +169,22 @@ async function load(key: string) {
       const blocked = (unavailableUntil.get(key) ?? 0) > Date.now();
       const live = onAir && canEmbed && !blocked;
       set(key, { live, replay: false, playlist: undefined, videoId: vid, status: live ? "ok" : "offline", reason: live ? undefined : !onAir ? "offair" : "blocked" });
+    } else if (ch.src?.includes("{gibsTime}")) {
+      // NASA GIBS: a missing slot answers with an XML error (or an empty picture): step back 10 minutes at a time.
+      let done = false;
+      for (let back = 0; back < 6 && !done; back++) {
+        const at = gibsTime(back);
+        const res = await fetch(ch.src.replace("{gibsTime}", at));
+        const blob = res.ok ? await res.blob() : null;
+        if (blob && blob.type.startsWith("image/") && !(await mostlyBlack(blob))) {
+          await setPicture(key, blob, Date.parse(at));
+          done = true;
+        }
+      }
+      if (!done) throw new Error("no recent GIBS image");
+    } else if (ch.jma) {
+      const pic = await jmaPicture(ch.jma);
+      await setPicture(key, pic.blob, pic.takenAt);
     } else {
       await fetchInto(key, bust(src!));
     }
@@ -184,6 +202,12 @@ async function fetchInto(key: string, src: string) {
   if (!res.ok) throw new Error(String(res.status));
   const blob = await res.blob();
   if (!blob.type.startsWith("image/")) throw new Error("not an image");
+  const lm = res.headers.get("last-modified");
+  await setPicture(key, blob, lm ? Date.parse(lm) : Date.now());
+}
+
+/** Show a new picture for `key` (object URL for the DOM, ImageBitmap for the CRT). */
+async function setPicture(key: string, blob: Blob, takenAt: number) {
   const bitmap = await createImageBitmap(blob);
   const e = entries.get(key);
   if (!e) {
@@ -191,8 +215,6 @@ async function fetchInto(key: string, src: string) {
     return;
   }
   const prev = e.snap;
-  const lm = res.headers.get("last-modified");
-  const takenAt = lm ? Date.parse(lm) : Date.now();
   set(key, {
     status: "ok",
     url: URL.createObjectURL(blob),
@@ -369,4 +391,32 @@ export function useSnap(ch: Channel | undefined, hd = false): Snap {
     () => (key ? getSnap(key) : EMPTY),
     () => EMPTY,
   );
+}
+
+// Language switch: bilingual pictures (speed-map panels) on screen reload now in the new language, not at their next poll.
+if (typeof window !== "undefined") {
+  let lastLang = store.get().lang;
+  store.subscribe(() => {
+    const lang = store.get().lang;
+    if (lang === lastLang) return;
+    lastLang = lang;
+    for (const [key, e] of entries) {
+      if (!CHANNEL_BY_KEY.get(key)?.src?.includes("{lang}")) continue;
+      clearTimeout(e.timer);
+      load(key);
+    }
+  });
+}
+
+/** A GIBS slot that isn't published yet comes back as coastlines on black: treat < 15% lit pixels as empty. */
+async function mostlyBlack(blob: Blob): Promise<boolean> {
+  const bmp = await createImageBitmap(blob, { resizeWidth: 64, resizeHeight: 36 });
+  const c = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(64, 36) : Object.assign(document.createElement("canvas"), { width: 64, height: 36 });
+  const ctx = c.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+  ctx.drawImage(bmp, 0, 0);
+  bmp.close();
+  const d = ctx.getImageData(0, 0, 64, 36).data;
+  let lit = 0;
+  for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 60) lit++;
+  return lit < 64 * 36 * 0.15;
 }

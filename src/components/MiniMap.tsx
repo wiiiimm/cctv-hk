@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ATTRIBUTION, FLIGHT_MS, fmtLatLon, flyView, pointIn, reducedMotion, tilesForView, viewOf, type MapView } from "../lib/maptiles";
 import { useT } from "../lib/i18n";
+import { actions, useStore } from "../lib/store";
 
 interface Props {
   lat: number;
@@ -77,5 +78,50 @@ export function MiniMap({ lat, lon, approx, label }: Props) {
         </a>
       </figcaption>
     </figure>
+  );
+}
+
+/**
+ * Map inset on the pinned / full-view tile of the normal wall (shown when the sidebar — and its map — is hidden).
+ * Same spots as the CRT inset: top-left under the channel label, or bottom-right above the pin buttons on a video.
+ * A click folds it to a small box (no coordinates) and back; the setting is shared with the CRT (`mapMini`).
+ */
+export function TileMap({ lat, lon, approx, video }: { lat: number; lon: number; approx: boolean; video: boolean }) {
+  const mini = useStore((s) => s.mapMini);
+  const t = useT();
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 160, h: 106 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const target = viewOf(lat, lon, approx ? 14 : 16);
+  const view = useFlight(target, size.w);
+  const pin = pointIn(view, target, size.w, size.h);
+  return (
+    <div
+      ref={ref}
+      className={`tile-map${video ? " on-video" : ""}${mini ? " mini" : ""}`}
+      role="button"
+      tabIndex={0}
+      title={mini ? t.mapExpand : t.mapFold}
+      aria-label={mini ? t.mapExpand : t.mapFold}
+      onClick={(e) => {
+        e.stopPropagation();
+        actions.toggleMapMini();
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), actions.toggleMapMini())}
+    >
+      {tilesForView(view, size.w, size.h).map((tl) => (
+        <img key={tl.key} src={tl.url} alt="" draggable={false} className="minimap-tile" style={{ left: tl.left, top: tl.top, width: tl.size, height: tl.size }} />
+      ))}
+      <div className="minimap-reticle" />
+      <div className={`minimap-pin${approx ? " approx" : ""}`} style={{ left: pin.x, top: pin.y }} />
+      {!mini && <span className="tile-map-coord">{fmtLatLon(lat, lon, 4)}{approx ? " ≈" : ""}</span>}
+    </div>
   );
 }

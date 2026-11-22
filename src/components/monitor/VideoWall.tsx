@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useMedia } from "../../hooks/useMedia";
 import { arrange, publishGeometry } from "../../lib/arrange";
 import { actions, bigAspect, feedCount, useStore, wallAspect } from "../../lib/store";
 import { CHANNEL_BY_KEY, MAX_PLAYING_PREVIEWS } from "../../lib/channels";
@@ -12,7 +13,10 @@ export const WALL_GAP = 3;
  * with the pinned video (if any) shown large beside or above them. It reports its capacity back to the store.
  */
 export function VideoWall() {
-  const { cells, selected, focused, muted, pinned, previewSize, pinMode, autoplay } = useStore((s) => s);
+  const { cells, selected, focused, muted, pinned, previewSize, pinMode, autoplay, theater } = useStore((s) => s);
+  // The sidebar (and its map) is hidden in theatre mode, and is a closed drawer on narrow screens.
+  const narrow = useMedia("(max-width: 1180px)");
+  const sidebarHidden = theater || narrow;
   const ref = useRef<HTMLDivElement>(null);
   const [area, setArea] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -74,6 +78,7 @@ export function VideoWall() {
                 // previews play muted when AUTOPLAY is on, else show a still + ▶ — except the selected one, which plays.
                 // One video has sound (see `muted` below).
                 allowVideo={big || i === selected || (autoplay && playable.has(i))}
+                mapOnTile={sidebarHidden}
                 // Sound goes to one video: the pinned / full-view one, or with nothing pinned the selected preview.
                 muted={muted || !(big || (!pinned && !solo && i === selected))}
               />

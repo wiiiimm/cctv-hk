@@ -2,7 +2,7 @@
 // HK Monitor service worker (modelled on midi-mixer's): an offline app shell, plus "last picture" caches so that with no
 // connection the wall still opens and every camera / weather / data tile shows the last image it had (the tile's age
 // stamp turns amber as usual). Live YouTube can't work offline; those tiles go OFF AIR.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = 'shell-' + VERSION;
 const MEDIA = 'media'; // last snapshot per camera / photo / radar / panel / thumbnail (kept across versions)
 const TILES = 'tiles'; // OpenStreetMap tiles already seen
@@ -74,7 +74,7 @@ self.addEventListener('message', (event) => {
 });
 
 // ---- requests ----
-const MEDIA_HOSTS = ['tdcctv.data.one.gov.hk', 'i.ytimg.com'];
+const MEDIA_HOSTS = ['tdcctv.data.one.gov.hk', 'i.ytimg.com', 'gibs.earthdata.nasa.gov'];
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -86,6 +86,9 @@ self.addEventListener('fetch', (event) => {
   // Live pictures: always try the network (they change every minute or two); offline, the last one we had.
   if ((same && url.pathname === '/api/snap') || MEDIA_HOSTS.includes(url.hostname) || (url.hostname === 'resource.data.one.gov.hk' && url.pathname.startsWith('/td/jss/')))
     return event.respondWith(networkFirst(request, MEDIA, 10000));
+  // JMA Himawari: the scan-time list is network-first (offline it points at tiles we already have), tiles cache-first.
+  if (url.hostname === 'www.jma.go.jp' && url.pathname.startsWith('/bosai/himawari/'))
+    return event.respondWith(url.pathname.endsWith('.json') ? networkFirst(request, DATA, 10000) : cacheFirst(request, MEDIA));
   if (same && (url.pathname === '/api/news' || url.pathname === '/api/ytlive')) return event.respondWith(networkFirst(request, DATA, 10000));
   if (url.hostname === 'tile.openstreetmap.org') return event.respondWith(cacheFirst(request, TILES));
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') return event.respondWith(staleWhileRevalidate(request, FONTS));
@@ -96,6 +99,7 @@ self.addEventListener('fetch', (event) => {
 function keyOf(request) {
   const url = new URL(request.url);
   url.searchParams.delete('t');
+  url.searchParams.delete('TIME'); // NASA GIBS: the newest picture replaces the last one
   return url.href;
 }
 

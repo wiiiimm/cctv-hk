@@ -30,8 +30,11 @@ group — but it's supporting cast, not the whole show.
 - **Near me.** Pick "Near me" and allow location: the wall fills with the 60 cameras and feeds closest to you, nearest
   first with distances, and the ticker leads with the weather at your nearest Observatory station. Your location stays
   on your device — it isn't saved, sent or put in shared links.
-- **A video wall that fills any screen.** Pick a preview size; the wall shows as many as fit. Pin a feed to make it
-  big (beside or above the previews, or full screen) — on desktop, tablet or phone.
+- **A video wall that fills any screen.** Pick a preview size; the wall shows as many as fit, up to 16 previews. Pin a
+  feed to make it big (beside or above the previews, or full screen) — on desktop, tablet or phone. The pinned feed
+  carries a small map (click it to fold it away).
+- **Satellite views of Hong Kong and Asia** from Himawari-9: true colour from the Japan Meteorological Agency, infrared
+  and air mass from NASA — alongside the Observatory's radar, in the Live data and Hong Kong weather groups.
 - **Patrol sequences** like a real CCTV desk: roll one preview at a time, flip whole pages, or queue channels through
   the pinned slot.
 - **CRT picture mode** — a WebGL colour CRT (curvature, phosphor masks, bloom, scanlines, static between channels,
@@ -44,8 +47,8 @@ group — but it's supporting cast, not the whole show.
 - **A news ticker** with Observatory warnings, the current weather, forecast and outlook (with weather icons),
   temperatures around Hong Kong and where it's raining, TD special traffic news and RTHK headlines — mixed into a new
   order on every visit, and part of the picture in CRT mode.
-- **Autoplay on or off** — with it off, YouTube previews show a still until you pick one; at most eight previews play
-  at once, and sound follows the pinned (or selected) video.
+- **Autoplay on or off** — on, every video preview plays (started one by one, at a lighter quality); off, previews
+  show a still until you pick one. Sound follows the pinned (or selected) video.
 - **Share the exact view** — every setting is in the URL (group, wall, pin, CRT look, language…).
 - **English / 繁體中文**, with the other language shown as secondary information wherever there's room.
 - Keyboard, on-screen remote, touch gestures (swipe, pinch, long-press) and standard gamepads.
@@ -60,6 +63,8 @@ All open, keyless sources:
   speed-map panels, special traffic news.
 - **Hong Kong Observatory**: weather photos, radar (64 / 128 / 256 km), satellite imagery, weather warnings, current
   weather, local forecast and outlook, station temperatures and district rainfall.
+- **Japan Meteorological Agency** Himawari-9 true-colour imagery, and **NASA GIBS** Himawari-9 infrared and air-mass
+  imagery.
 - **RTHK** news headlines (RSS).
 - **YouTube** live streams and channel uploads — played through YouTube's own embedded player. Streams and videos
   belong to their owners; channels that don't allow playback on other sites aren't included.
@@ -124,7 +129,9 @@ YouTube 頻道，全部編上頻道號碼，排成閉路電視監察牆，自動
   世界直播（3xx）、新聞及財經（4xx）、太空（5xx）、新聞重溫（6xx）及香港 YouTube 節目（3000+）。用鍵盤或畫面上的遙控器輸入號碼即可轉台。
 - **我附近。** 選擇「我附近」並允許位置權限：牆上會顯示離你最近的 60 個鏡頭及來源（由近至遠，附距離），跑馬燈亦會先顯示最近天文台
   站的天氣。你的位置只留在你的裝置上 — 不會儲存、不會傳送，也不會放進分享連結。
-- **填滿任何螢幕的監察牆。** 自選預覽大小，能放多少就放多少。釘選一個畫面放大（在預覽旁、上方或全螢幕）— 電腦、平板、手機皆可。
+- **填滿任何螢幕的監察牆。** 自選預覽大小，能放多少就放多少（最多 16 個預覽）。釘選一個畫面放大（在預覽旁、上方或全螢幕）—
+  電腦、平板、手機皆可。釘選畫面附小地圖（點擊可收起）。
+- **香港及亞洲衛星圖**：向日葵 9 號 — 日本氣象廳真彩色圖，以及 NASA 紅外線及氣團圖，與天文台雷達一起放在「實時數據」及「香港天氣」組別。
 - **自動巡邏**，像真正的閉路電視控制台：逐格輪換、整頁翻頁，或讓頻道輪流進入釘選位置。
 - **CRT 畫面模式** — WebGL 彩色顯像管（弧度、螢光點、光暈、掃描線、轉台雪花、開關機效果），有多款外觀，由 Trinitron 監視器到綠色 /
   琥珀色單色管。弧度可關閉。
@@ -134,7 +141,7 @@ YouTube 頻道，全部編上頻道號碼，排成閉路電視監察牆，自動
   的錄影 — 最近的錄影亦有自己的頻道。
 - **新聞跑馬燈**：天文台警告、現時天氣、預測及展望（附天氣圖示）、各區氣溫及下雨地區、運輸署特別交通消息及香港電台新聞 — 每次開啟
   次序都不同，在 CRT 模式下更是畫面的一部分。
-- **自動播放開關** — 關閉時 YouTube 預覽只顯示靜止畫面，直至你選擇；同時最多播放八個預覽，聲音跟隨釘選（或選取）的影片。
+- **自動播放開關** — 開啟時所有影片預覽都會播放（逐個啟動、較輕的畫質）；關閉時預覽只顯示靜止畫面，直至你選擇。聲音跟隨釘選（或選取）的影片。
 - **分享完全相同的畫面** — 所有設定都在網址中（組別、牆、釘選、CRT 外觀、語言…）。
 - **繁體中文 / English**，空間足夠時同時顯示另一種語言。
 - 鍵盤、畫面遙控器、觸控手勢（滑動、雙指縮放、長按）及標準遊戲手掣。
@@ -146,6 +153,7 @@ YouTube 頻道，全部編上頻道號碼，排成閉路電視監察牆，自動
 
 - **運輸署**（經 [資料一線通 DATA.GOV.HK](https://data.gov.hk)）：交通攝影機快照（1,013 部，約每 2 分鐘）、行車速度圖、特別交通消息。
 - **香港天文台**：天氣相機、雷達（64 / 128 / 256 公里）、衛星圖、天氣警告、現時天氣、本港天氣預測及展望、各站氣溫及分區雨量。
+- **日本氣象廳** 向日葵 9 號真彩色衛星圖，及 **NASA GIBS** 向日葵 9 號紅外線及氣團圖。
 - **香港電台** 新聞（RSS）。
 - **YouTube** 直播及頻道影片 — 以 YouTube 自己的嵌入式播放器播放。影片版權屬原擁有者；不容許在其他網站播放的頻道不會收錄。
 - 地圖圖塊 © [OpenStreetMap](https://www.openstreetmap.org/copyright) 貢獻者。

@@ -128,7 +128,63 @@ export function fillBox(x: number, y: number, w: number, h: number, previewW: nu
   return gridRects(f, gap, f.cols * f.rows, x, y);
 }
 
+/** Hard cap: at most this many previews per screen (plus the pinned video), so every video preview can play. */
+export const MAX_PREVIEWS = 16;
+
+const previewCount = (r: Arrangement) => (r.kind === "solo" ? 0 : r.kind === "grid" ? r.capacity : r.capacity - 1);
+
+/**
+ * The wall for this stage. Asked-for previews too small to stay within MAX_PREVIEWS are enlarged in small steps, so
+ * the screen still fills with as many previews as possible up to the cap (16 when they fit, not a jump down to 12).
+ */
 export function arrange(a: ArrangeInput): Arrangement {
+  const first = arrangeOnce(a);
+  if (previewCount(first) <= MAX_PREVIEWS) return first;
+  if (!a.pinned && !a.solo) return cappedGrid(a);
+  const search = (input: ArrangeInput) => {
+    let res = arrangeOnce(input);
+    for (let q = input.previewW, i = 0; previewCount(res) > MAX_PREVIEWS && i < 160; i++) {
+      q *= 1.02;
+      res = arrangeOnce({ ...input, previewW: q });
+    }
+    return res;
+  };
+  let res = search(a);
+  // "Side" keeps a block plus full rows / columns of previews, which on a tall phone can't get under the cap:
+  // lay it out "wide" (picture on top, previews below) instead.
+  if (previewCount(res) > MAX_PREVIEWS && a.pinned && a.pinMode === "side") res = search({ ...a, pinMode: "wide" });
+  // Last resort (never expected): drop the extra previews.
+  if (previewCount(res) > MAX_PREVIEWS) {
+    const keep = MAX_PREVIEWS + (res.kind === "grid" ? 0 : 1);
+    res = { ...res, rects: res.rects.slice(0, keep), capacity: keep };
+  }
+  return res;
+}
+
+/** No pin, over the cap: of every grid with at most MAX_PREVIEWS cells, the one covering the most of the stage (more
+ * cells when two cover about the same). A group with fewer feeds is re-fitted to its count as usual. */
+function cappedGrid(a: ArrangeInput): Arrangement {
+  const { w, h, gap } = a;
+  const flex = a.flex ?? FLEX;
+  const aspect = a.aspect ?? CELL_ASPECT;
+  let best: (GridFit & { score: number }) | null = null;
+  for (let cols = 1; cols <= MAX_PREVIEWS; cols++)
+    for (let rows = 1; cols * rows <= MAX_PREVIEWS; rows++) {
+      const f = fitGrid(w, h, cols, rows, gap, flex, aspect);
+      if (f.cellW <= 0 || f.cellH <= 0) continue;
+      const score = (f.cellW * f.cellH * cols * rows) / (w * h) + 0.004 * cols * rows;
+      if (!best || score > best.score) best = { ...f, score };
+    }
+  const g = best!;
+  const capacity = g.cols * g.rows;
+  if (a.count !== undefined && a.count > 0 && a.count < capacity) {
+    const f = countGrid(w, h, a.count, g.cols, gap, flex, aspect);
+    return { rects: gridRects(f, gap, a.count), capacity, kind: "grid" };
+  }
+  return { rects: gridRects(g, gap, capacity), capacity, kind: "grid" };
+}
+
+function arrangeOnce(a: ArrangeInput): Arrangement {
   const { w, h, gap } = a;
   const flex = a.flex ?? FLEX;
   const aspect = a.aspect ?? CELL_ASPECT;

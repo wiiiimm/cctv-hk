@@ -1,6 +1,6 @@
 import tdCameras from "../data/td-cameras.json";
 import { HKO_STATIONS } from "../data/hko-stations";
-import { DATA_FEEDS } from "../data/live-data";
+import { DATA_FEEDS, type JmaTiles } from "../data/live-data";
 import { LIVE_STREAMS, NEWS_STREAMS, RECORDING_SOURCES, SPACE_STREAMS, WORLD_STREAMS } from "../data/streams";
 
 export type FeedKind = "td" | "hko" | "yt";
@@ -27,6 +27,8 @@ export interface Channel {
   noEmbed?: boolean;
   /** Direct image URL overriding the kind's usual one ({lang} → tc / en), e.g. TD speed-map panels. */
   src?: string;
+  /** JMA Himawari tiles to stitch (satellite feeds). */
+  jma?: JmaTiles;
   /** How often the source publishes a new picture. */
   refreshMs: number;
 }
@@ -159,12 +161,13 @@ function build(): Channel[] {
       kind: d.kind,
       code: d.code,
       src: d.src,
+      jma: d.jma,
       name: d.name,
       nameZh: d.nameZh,
       region: "Live data",
       regionZh: "實時數據",
-      district: d.kind === "hko" ? "Observatory" : "Transport Department",
-      districtZh: d.kind === "hko" ? "天文台" : "運輸署",
+      district: d.by ?? (d.kind === "hko" ? "Observatory" : "Transport Department"),
+      districtZh: d.byZh ?? (d.kind === "hko" ? "天文台" : "運輸署"),
       geo: d.lat != null && d.lon != null ? { lat: d.lat, lon: d.lon, approx: false } : undefined,
       refreshMs: d.refreshMs,
     });
@@ -426,7 +429,7 @@ function buildGroups(): ChannelGroup[] {
       labelZh: "賽馬",
       keys: NEWS_STREAMS.filter((s) => s.racing).sort((a, b) => a.num - b.num).map((s) => `yt:${s.id}`),
     },
-    { id: "kind:hko", section: "type", label: "HKO weather", labelZh: "天文台天氣", keys: keysOf(CHANNELS.filter((c) => c.kind === "hko")) },
+    { id: "kind:hko", section: "type", label: "Hong Kong weather", labelZh: "香港天氣", keys: keysOf(CHANNELS.filter((c) => c.kind === "hko")) },
     { id: "kind:td", section: "type", label: "Traffic", labelZh: "交通", keys: keysOf(CHANNELS.filter((c) => c.kind === "td")) },
   ];
   for (const t of TOPICS) {
@@ -450,12 +453,17 @@ function buildGroups(): ChannelGroup[] {
 export const GROUPS: ChannelGroup[] = buildGroups();
 export const GROUP_BY_ID = new Map(GROUPS.map((g) => [g.id, g]));
 
+/** NASA GIBS publishes Himawari every 10 minutes, ~40 minutes behind (a slot is now and then missing): the slot
+ * `back` steps (of 10 minutes) before the newest one it usually has. */
+export function gibsTime(back = 0): string {
+  const t = Math.floor((Date.now() - 40 * 60_000) / 600_000) * 600_000 - back * 600_000;
+  return new Date(t).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
 /** Raw snapshot URL for a still-image feed. HKO goes through the same-origin relay (no CORS upstream). */
-export function snapshotUrl(ch: Channel, hd = false): string | null {
-  if (ch.src) {
-    const zh = typeof document !== "undefined" && document.documentElement.lang.startsWith("zh");
-    return ch.src.replace("{lang}", zh ? "tc" : "en");
-  }
+export function snapshotUrl(ch: Channel, hd = false, lang: "en" | "zh" = "en"): string | null {
+  // Bilingual sources (TD speed-map panels) come in the viewer's language.
+  if (ch.src) return ch.src.replace("{lang}", lang === "zh" ? "tc" : "en").replace("{gibsTime}", gibsTime());
   switch (ch.kind) {
     case "td":
       return `https://tdcctv.data.one.gov.hk/${ch.code}.JPG`;
@@ -501,4 +509,4 @@ export function feedAspect(ch: Channel | undefined): number {
  * YouTube refuses bursts of simultaneous players — a 30-tile group of streams would otherwise come up as "blocked" —
  * and it is heavy on the machine; the other previews show their still with ▶.
  */
-export const MAX_PLAYING_PREVIEWS = 8;
+export const MAX_PLAYING_PREVIEWS = 16; // = MAX_PREVIEWS in lib/arrange: every preview on screen may play
