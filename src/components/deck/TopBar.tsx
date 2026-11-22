@@ -104,6 +104,16 @@ function SoundToggle() {
   );
 }
 
+function NewsToggle() {
+  const t = useT();
+  const news = useStore((s) => s.news);
+  return (
+    <button type="button" className={`pill toggle${news ? " on" : ""}`} onClick={actions.toggleNews} title={t.newsTitle} aria-pressed={news}>
+      {t.news}
+    </button>
+  );
+}
+
 function LangToggle() {
   const t = useT();
   const lang = useStore((s) => s.lang);
@@ -192,6 +202,7 @@ function MorePanel({ onClose }: { onClose: () => void }) {
       <div className="tb-sheet-row">
         <div className="tb-group">
           <SoundToggle />
+          <NewsToggle />
           <LangToggle />
           <ShareButton />
         </div>
@@ -258,6 +269,7 @@ export function TopBar({ onGuide, sidebarShown = true }: { onGuide: () => void; 
           </div>
           <div className="tb-group">
             <SoundToggle />
+            <NewsToggle />
             <LangToggle />
             <ShareButton />
           </div>

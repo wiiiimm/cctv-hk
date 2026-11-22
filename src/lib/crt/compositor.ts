@@ -4,7 +4,8 @@ import { CHANNEL_BY_KEY, fmtNum } from "../channels";
 import { DICTS, chAltName, chName } from "../i18n";
 import type { Lang } from "../store";
 import { getSnap } from "../snapshots";
-import { DARKEN, TILE, project, tileImage, tileUrl } from "../maptiles";
+import type { NewsItem } from "../news";
+import { DARKEN, FLIGHT_MS, flyView, pointIn, reducedMotion, tileImage, tilesForView, viewOf, type MapView } from "../maptiles";
 import { hkStamp } from "../../hooks/useClock";
 import { arrange, type PinMode } from "../arrange";
 import { ICON_PATHS, type IconName } from "../../components/icons";
@@ -38,6 +39,10 @@ export interface ScreenView {
   pinUi?: { cell: number; buttons: { icon: IconName; on: boolean }[]; opacity: number };
   /** Feeds available for the wall (re-fits small groups, same as the DOM wall). */
   count?: number;
+  /** News ticker items drawn in a band across the top of the tube (null = off). */
+  news?: NewsItem[] | null;
+  /** Height of that band in CSS px. */
+  newsH?: number;
   aspect?: number;
   pinAspect?: number;
   /** Safe margin (fraction of each side) so the wall clears the tube's curved edge and vignette. */
@@ -187,11 +192,17 @@ function drawCell(ctx: CanvasRenderingContext2D, key: string, x: number, y: numb
   if (showStamp) caption(ctx, stamp, big ? x + pad : x + w - pad, y + h - fs - pad * 0.6, fs, big ? "left" : "right");
 }
 
+// The CRT map flies between pinned locations like the sidebar map (state kept across frames).
+let mapFlight: { from: MapView; to: MapView; t0: number } | null = null;
+let mapShown: MapView | null = null;
+
 function drawMap(ctx: CanvasRenderingContext2D, lat: number, lon: number, approx: boolean, x: number, y: number, w: number, h: number, now: number) {
-  const z = approx ? 14 : 16;
-  const c = project(lat, lon, z);
-  const px = c.x * TILE - w / 2;
-  const py = c.y * TILE - h / 2;
+  const target = viewOf(lat, lon, approx ? 14 : 16);
+  const same = (p: MapView | null) => !!p && p.x === target.x && p.y === target.y && p.z === target.z;
+  if (!same(mapFlight?.to ?? null)) mapFlight = { from: mapShown && !reducedMotion() ? mapShown : target, to: target, t0: now };
+  const f = mapFlight!;
+  const view = now - f.t0 >= FLIGHT_MS ? target : flyView(f.from, target, (now - f.t0) / FLIGHT_MS, w);
+  mapShown = view;
   ctx.save();
   ctx.beginPath();
   ctx.rect(x, y, w, h);
@@ -199,22 +210,24 @@ function drawMap(ctx: CanvasRenderingContext2D, lat: number, lon: number, approx
   ctx.fillStyle = "#0b0d10";
   ctx.fillRect(x, y, w, h);
   ctx.filter = DARKEN;
-  const n = 2 ** z;
-  for (let tx = Math.floor(px / TILE); tx <= Math.floor((px + w) / TILE); tx++)
-    for (let ty = Math.floor(py / TILE); ty <= Math.floor((py + h) / TILE); ty++) {
-      const img = tileImage(tileUrl(z, ((tx % n) + n) % n, ty));
-      if (img) ctx.drawImage(img, x + tx * TILE - px, y + ty * TILE - py, TILE, TILE);
-    }
+  for (const tl of tilesForView(view, w, h)) {
+    const img = tileImage(tl.url);
+    if (img) ctx.drawImage(img, x + tl.left, y + tl.top, tl.size, tl.size);
+  }
   ctx.filter = "none";
-  const cx = x + w / 2;
-  const cy = y + h / 2;
+  // Reticle stays centred; the pin rides with the map until the flight lands.
+  const pin = pointIn(view, target, w, h);
+  const rx = x + w / 2;
+  const ry = y + h / 2;
+  const cx = x + pin.x;
+  const cy = y + pin.y;
   ctx.strokeStyle = "rgba(255,210,0,0.55)";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(x, cy);
-  ctx.lineTo(x + w, cy);
-  ctx.moveTo(cx, y);
-  ctx.lineTo(cx, y + h);
+  ctx.moveTo(x, ry);
+  ctx.lineTo(x + w, ry);
+  ctx.moveTo(rx, y);
+  ctx.lineTo(rx, y + h);
   ctx.stroke();
   const pulse = (now % 1600) / 1600;
   ctx.strokeStyle = `rgba(255,59,48,${1 - pulse})`;
@@ -308,6 +321,73 @@ function drawPinUi(ctx: CanvasRenderingContext2D, r: CellRect, ui: NonNullable<S
   ctx.restore();
 }
 
+// ---- News ticker band (CRT): same content and order as the DOM ticker, crawled on the canvas ----
+const TICKER_SPEED = 70; // CSS px per second
+let tickerCache: { items: NewsItem[]; lang: string; fs: number; runs: { tag?: string; tagBg?: string; tagFg?: string; text: string; color: string; tagW: number; textW: number; w: number }[]; total: number } | null = null;
+
+function drawTicker(ctx: CanvasRenderingContext2D, items: NewsItem[], lang: Lang, x: number, y: number, w: number, h: number, scale: number, now: number) {
+  const d = DICTS[lang];
+  const fs = Math.round(h * 0.78);
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.9)";
+  ctx.fillRect(x, y, w, h);
+  // Label block.
+  ctx.font = `${fs}px ${OSD}`;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left"; // other OSD text leaves right / centre alignment behind
+  const label = d.newsLabel;
+  const lw = ctx.measureText(label).width + fs * 0.9;
+  ctx.fillStyle = "#d71f1f";
+  ctx.fillRect(x, y, lw, h);
+  ctx.fillStyle = "#fff";
+  ctx.fillText(label, x + fs * 0.45, y + h / 2 + 1);
+  const vx = x + lw + fs * 0.4;
+  const vw = w - (vx - x);
+  ctx.beginPath();
+  ctx.rect(vx, y, vw, h);
+  ctx.clip();
+  if (!items.length) {
+    ctx.restore();
+    return;
+  }
+  if (!tickerCache || tickerCache.items !== items || tickerCache.lang !== lang || tickerCache.fs !== fs) {
+    const gap = fs * 2.2;
+    const runs = items.map((it) => {
+      const tag = it.kind === "warn" ? d.newsWarn : it.kind === "traffic" ? d.newsTraffic : undefined;
+      const time = it.kind !== "traffic" && it.time ? new Date(it.time).toLocaleTimeString("en-GB", { timeZone: "Asia/Hong_Kong", hour: "2-digit", minute: "2-digit" }) + "  " : "";
+      const text = time + it.text;
+      const tagW = tag ? ctx.measureText(tag).width + fs * 0.7 : 0;
+      const textW = ctx.measureText(text).width;
+      return { tag, tagBg: it.kind === "warn" ? "#d71f1f" : "#c27c00", tagFg: it.kind === "warn" ? "#fff" : "#000", text, color: it.kind === "warn" ? "#ff8a80" : "#f2f2f2", tagW, textW, w: (tag ? tagW + fs * 0.5 : 0) + textW + gap };
+    });
+    tickerCache = { items, lang, fs, runs, total: runs.reduce((a, r) => a + r.w, 0) };
+  }
+  const { runs, total } = tickerCache;
+  const offset = ((now / 1000) * TICKER_SPEED * scale) % total;
+  let cx = vx - offset;
+  while (cx < vx + vw) {
+    for (const r of runs) {
+      if (cx > vx + vw) break;
+      if (cx + r.w > vx) {
+        let px = cx;
+        if (r.tag) {
+          ctx.fillStyle = r.tagBg!;
+          ctx.fillRect(px, y + h * 0.14, r.tagW, h * 0.72);
+          ctx.fillStyle = r.tagFg!;
+          ctx.fillText(r.tag, px + fs * 0.35, y + h / 2 + 1);
+          px += r.tagW + fs * 0.5;
+        }
+        ctx.fillStyle = r.color;
+        ctx.fillText(r.text, px, y + h / 2 + 1);
+        ctx.fillStyle = "#666";
+        ctx.fillText("◆", px + r.textW + fs * 0.8, y + h / 2 + 1);
+      }
+      cx += r.w;
+    }
+  }
+  ctx.restore();
+}
+
 /** Draws the screen and returns each visible cell's rectangle (by cell index) in canvas pixels. */
 export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, v: ScreenView, now: number): Map<number, CellRect> {
   const rects = new Map<number, CellRect>();
@@ -316,13 +396,15 @@ export function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, 
   const gap = v.single ? 0 : 3 * v.scale;
   // Same arrangement as the DOM wall, inside the tube's safe area.
   const mx = w * v.inset;
+  const band = v.news ? (v.newsH ?? 0) * v.scale : 0;
   const my = h * v.inset;
-  const layout = arrange({ w: w - mx * 2, h: h - my * 2, previewW: v.previewW * v.scale, pinned: v.pinned, pinMode: v.pinMode, solo: v.single, gap, count: v.count, aspect: v.aspect, pinAspect: v.pinAspect });
+  if (v.news) drawTicker(ctx, v.news, v.lang, mx, my, w - mx * 2, band - 3 * v.scale, v.scale, now);
+  const layout = arrange({ w: w - mx * 2, h: h - my * 2 - band, previewW: v.previewW * v.scale, pinned: v.pinned, pinMode: v.pinMode, solo: v.single, gap, count: v.count, aspect: v.aspect, pinAspect: v.pinAspect });
   const indices = v.single ? [v.selected] : v.cells.map((_, i) => i).slice(0, layout.rects.length);
 
   indices.forEach((ci, slot) => {
     const q = layout.rects[slot];
-    const r = { x: q.x + mx, y: q.y + my, w: q.w, h: q.h };
+    const r = { x: q.x + mx, y: q.y + my + band, w: q.w, h: q.h };
     rects.set(ci, r);
     const big = v.single || (v.pinned && ci === 0);
     const highlight = !v.single && ci === v.selected && !big;

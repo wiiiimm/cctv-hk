@@ -215,10 +215,10 @@ export function videoFilter(p: CrtPreset): string {
   return `saturate(${p.saturation}) contrast(${p.contrast}) brightness(${p.brightness})${blur}`;
 }
 
-/** Curvature actually used: cut to 30% on phones, where the barrel warp eats too much of a small screen. */
+/** Curvature actually used: 60% of the preset on desktop, 30% on phones (gentle barrel, more picture). */
 export function crtCurvature(p: CrtPreset): number {
   const phone = typeof window !== "undefined" && Math.min(window.innerWidth, window.innerHeight) < 600;
-  return p.curvature * (phone ? 0.3 : 1);
+  return p.curvature * (phone ? 0.3 : 0.6);
 }
 
 /** Margin (fraction per side) that keeps picture content clear of the curved, vignetted tube edge. */

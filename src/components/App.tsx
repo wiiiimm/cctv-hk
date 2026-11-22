@@ -8,6 +8,7 @@ import { TopBar } from "./deck/TopBar";
 import { Sidebar } from "./deck/Sidebar";
 import { StatusBar } from "./deck/StatusBar";
 import { MobileBar } from "./deck/MobileBar";
+import { NewsTicker } from "./deck/NewsTicker";
 import { useMedia } from "../hooks/useMedia";
 import { useWallGestures } from "../hooks/useWallGestures";
 import { VideoWall } from "./monitor/VideoWall";
@@ -18,6 +19,7 @@ export default function App() {
   const mode = useStore((s) => s.mode);
   const lang = useStore((s) => s.lang);
   const theater = useStore((s) => s.theater);
+  const newsOn = useStore((s) => s.news);
   const [guideOpen, setGuideOpen] = useState(false);
   // One "show / hide sidebar" control at every width: a slide-out drawer below 1180px, a collapsible column above.
   // Re-rendered live when the window crosses a breakpoint (resize / rotate).
@@ -99,9 +101,14 @@ export default function App() {
         {/* Drawer mode only (hidden on wide screens): click outside the drawer to close it. */}
         {guideOpen && <div className="drawer-backdrop" onClick={() => setGuideOpen(false)} aria-hidden />}
         {/* CRT is a picture mode of the same viewer, not a separate screen. */}
-        <main className="stage" ref={stageRef}>
-          {mode === "crt" || crtExit ? <CrtScreen exiting={mode !== "crt"} /> : <VideoWall />}
-        </main>
+        {/* The viewer column: news ticker on top (part of the viewer, not over the sidebar), then the stage. */}
+        <div className="viewer">
+          {/* In CRT mode the ticker is drawn inside the tube instead (see compositor). */}
+          {newsOn && mode !== "crt" && !crtExit && <NewsTicker />}
+          <main className="stage" ref={stageRef}>
+            {mode === "crt" || crtExit ? <CrtScreen exiting={mode !== "crt"} /> : <VideoWall />}
+          </main>
+        </div>
       </div>
       {phone ? <MobileBar /> : <StatusBar />}
     </div>

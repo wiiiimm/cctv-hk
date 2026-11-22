@@ -63,3 +63,70 @@ export function tileImage(url: string): HTMLImageElement | null {
   }
   return img.complete && img.naturalWidth ? img : null;
 }
+
+// ---- Animated map views (sidebar mini-map and the CRT map inset share this) ----
+
+/** A map view: centre in normalised world coordinates (0..1) and a fractional zoom. */
+export interface MapView {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export function viewOf(lat: number, lon: number, z: number): MapView {
+  const c = project(lat, lon, 0);
+  return { x: c.x, y: c.y, z };
+}
+
+export const FLIGHT_MS = 900;
+const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+
+/**
+ * View at progress t (0..1) of a flight from `a` to `b` in a viewport `w` px wide. Short hops pan; longer ones
+ * zoom out far enough to keep both points in view, pan, then zoom back in.
+ */
+export function flyView(a: MapView, b: MapView, t: number, w: number): MapView {
+  const e = ease(Math.min(1, Math.max(0, t)));
+  const zEnd = Math.min(a.z, b.z);
+  const dist = Math.hypot(b.x - a.x, b.y - a.y) * 2 ** zEnd * TILE; // px at the lower of the two zooms
+  const zMid = dist > w * 0.6 ? Math.max(9, zEnd - Math.log2(dist / (w * 0.6))) : (a.z + b.z) / 2;
+  const dip = Math.max(0, (a.z + b.z) / 2 - zMid);
+  return {
+    x: a.x + (b.x - a.x) * e,
+    y: a.y + (b.y - a.y) * e,
+    z: a.z + (b.z - a.z) * e - dip * 4 * e * (1 - e),
+  };
+}
+
+export interface ViewTile {
+  key: string;
+  url: string;
+  left: number;
+  top: number;
+  size: number;
+}
+
+/** Tiles (positioned and sized in viewport px) covering a w×h viewport at a fractional-zoom view. */
+export function tilesForView(v: MapView, w: number, h: number): ViewTile[] {
+  const zi = Math.max(0, Math.min(19, Math.floor(v.z)));
+  const s = 2 ** (v.z - zi);
+  const n = 2 ** zi;
+  const px = v.x * n * TILE - w / s / 2;
+  const py = v.y * n * TILE - h / s / 2;
+  const out: ViewTile[] = [];
+  for (let x = Math.floor(px / TILE); x <= Math.floor((px + w / s) / TILE); x++)
+    for (let y = Math.floor(py / TILE); y <= Math.floor((py + h / s) / TILE); y++) {
+      if (y < 0 || y >= n) continue;
+      const wx = ((x % n) + n) % n;
+      out.push({ key: `${zi}/${wx}/${y}`, url: tileUrl(zi, wx, y), left: (x * TILE - px) * s, top: (y * TILE - py) * s, size: TILE * s });
+    }
+  return out;
+}
+
+/** Where world point `p` sits in a w×h viewport showing view `v`. */
+export function pointIn(v: MapView, p: { x: number; y: number }, w: number, h: number) {
+  const k = 2 ** v.z * TILE;
+  return { x: w / 2 + (p.x - v.x) * k, y: h / 2 + (p.y - v.y) * k };
+}
+
+export const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;

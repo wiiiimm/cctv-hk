@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CHANNEL_BY_KEY, fmtNum, youtubeEmbed } from "../../lib/channels";
 import { getSnap, retain, useSnap } from "../../lib/snapshots";
 import { lastTouchAt } from "../../hooks/useWallGestures";
+import { CRT_NEWS_H, useNews, type NewsItem } from "../../lib/news";
 import { actions, bigAspect, feedCount, store, useStore, wallAspect } from "../../lib/store";
 import { drawScreen } from "../../lib/crt/compositor";
 import { arrange, publishGeometry, type PinMode, type Rect } from "../../lib/arrange";
@@ -101,12 +102,14 @@ function pinButtons(s: { pinned: boolean; focused: boolean; selected: number; pi
 }
 
 /** The CRT wall arrangement in CSS px of the tube (same engine as the DOM wall, inside the safe-area inset). */
-function crtLayout(w: number, h: number, s: { previewSize: number; pinned: boolean; pinMode: PinMode; focused: boolean; crtPreset: string; count?: number; aspect?: number; pinAspect?: number }): { rects: Rect[]; capacity: number } {
+function crtLayout(w: number, h: number, s: { previewSize: number; pinned: boolean; pinMode: PinMode; focused: boolean; crtPreset: string; count?: number; aspect?: number; pinAspect?: number; news?: boolean }): { rects: Rect[]; capacity: number } {
   const m = crtInset(crtCurvature(presetById(s.crtPreset)));
   const mx = w * m;
+  // The news band sits across the top of the tube, inside the safe area; the wall starts below it.
+  const band = s.news ? CRT_NEWS_H : 0;
   const my = h * m;
-  const a = arrange({ w: w - mx * 2, h: h - my * 2, previewW: s.previewSize, pinned: s.pinned, pinMode: s.pinMode, solo: s.focused, gap: s.focused ? 0 : 3, count: s.count, aspect: s.aspect, pinAspect: s.pinAspect });
-  return { rects: a.rects.map((r) => ({ ...r, x: r.x + mx, y: r.y + my })), capacity: a.capacity };
+  const a = arrange({ w: w - mx * 2, h: h - my * 2 - band, previewW: s.previewSize, pinned: s.pinned, pinMode: s.pinMode, solo: s.focused, gap: s.focused ? 0 : 3, count: s.count, aspect: s.aspect, pinAspect: s.pinAspect });
+  return { rects: a.rects.map((r) => ({ ...r, x: r.x + mx, y: r.y + my + band })), capacity: a.capacity };
 }
 
 /**
@@ -120,6 +123,8 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null);
   // Pointer over the tube: pinned / full-view buttons only show on hover (like the normal wall).
   const hoverRef = useRef(false);
+  // Latest news for the frame loop (null = ticker off).
+  const newsRef = useRef<NewsItem[] | null>(null);
   const [fallback, setFallback] = useState(false);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const cells = useStore((s) => s.cells);
@@ -249,6 +254,8 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
           lang: s.lang,
           inset: crtInset(crtCurvature(preset)),
           count: feedCount(s),
+          news: newsRef.current,
+          newsH: CRT_NEWS_H,
           aspect: wallAspect(s),
           pinAspect: bigAspect(s),
           scale: src.width / Math.max(1, wrap.clientWidth),
@@ -287,7 +294,7 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
     const r = e.currentTarget.getBoundingClientRect();
     const px = e.clientX - r.left;
     const py = e.clientY - r.top;
-    const i = crtLayout(r.width, r.height, { ...s, count: feedCount(s), aspect: wallAspect(s), pinAspect: bigAspect(s) }).rects.findIndex((q) => px >= q.x && px < q.x + q.w && py >= q.y && py < q.y + q.h);
+    const i = crtLayout(r.width, r.height, { ...s, count: feedCount(s), aspect: wallAspect(s), pinAspect: bigAspect(s), news: s.news }).rects.findIndex((q) => px >= q.x && px < q.x + q.w && py >= q.y && py < q.y + q.h);
     if (i < 0) {
       if (!dbl) actions.deselect(); // empty part of the tube
       return;
@@ -299,9 +306,12 @@ export function CrtScreen({ exiting = false }: { exiting?: boolean }) {
 
   // Pin controls float over the selected tile (PIN) or the pinned video (SOLO / UNPIN), matching the CRT geometry.
   const count = useStore(feedCount);
+  const newsOn = useStore((s) => s.news);
+  const news = useNews(newsOn ? lang : null);
+  newsRef.current = newsOn ? (news ?? []) : null;
   const aspect = useStore(wallAspect);
   const pinAspect = useStore(bigAspect);
-  const crt = size.w > 0 ? crtLayout(size.w, size.h, { ...pin, crtPreset: preset, count, aspect, pinAspect }) : { rects: [] as Rect[], capacity: 0 };
+  const crt = size.w > 0 ? crtLayout(size.w, size.h, { ...pin, crtPreset: preset, count, aspect, pinAspect, news: newsOn }) : { rects: [] as Rect[], capacity: 0 };
   const rects = crt.rects;
   let controls: { role: "selected" | "pinned" | "solo"; index: number; x: number; y: number; w: number; h: number } | null = null;
   if (rects.length && (selected >= 0 || pin.pinned)) {

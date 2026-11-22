@@ -51,6 +51,8 @@ export interface State {
   customGroups: CustomGroup[];
   showMap: boolean;
   muted: boolean;
+  /** News ticker bar (HKO warnings, TD traffic news, RTHK headlines). */
+  news: boolean;
   /** Timestamp of the last channel change, used for static bursts and the channel OSD. */
   switchedAt: number;
   /** Which cell the last change hit (-1 = the whole screen), so the CRT only disturbs that frame. */
@@ -60,7 +62,7 @@ export interface State {
 }
 
 const STORAGE_KEY = "cctv-hk:v1";
-const PERSIST: (keyof State)[] = ["previewSize", "pinMode", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "customGroups", "patrolSec", "patrolMode", "muted"];
+const PERSIST: (keyof State)[] = ["previewSize", "pinMode", "pinned", "pinFrom", "focused", "theater", "cells", "groupId", "page", "mode", "crtPreset", "lang", "favourites", "customGroups", "patrolSec", "patrolMode", "muted", "news"];
 
 function groupKeys(s: Pick<State, "groupId" | "favourites" | "customGroups">): string[] {
   if (s.groupId === "favourites") return s.favourites.length ? s.favourites : GROUP_BY_ID.get("featured")!.keys;
@@ -99,6 +101,7 @@ function initial(): State {
     customGroups: [],
     showMap: true,
     muted: true,
+    news: true,
     switchedAt: 0,
     switchedCell: -1,
     entry: "",
@@ -560,6 +563,9 @@ export const actions = {
       // Static stays confined to a frame (never the whole tube) even when several swap at once.
       return { cells, switchedAt: (lastTick = Date.now()), switchedCell: lastSlot };
     });
+  },
+  toggleNews() {
+    update((s) => ({ news: !s.news }));
   },
   togglePatrol() {
     update((s) => ({ patrol: !s.patrol }));

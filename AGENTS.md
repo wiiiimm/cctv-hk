@@ -30,7 +30,7 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   (same rule when restoring saved state). The wall never shows a channel twice.
 - Phones / small tablets: below 1100px the top bar is one row (☰, brand, PATROL, CRT, ⋯ sheet with the rest);
   below 760px `MobileBar` replaces the status bar (camera actions or group + pager); no bottom bar under 500px
-  high. Preview badges become dots below 760px (not on the pinned / full tile). CRT curvature is 30% on phones
+  high. Preview badges become dots below 760px (not on the pinned / full tile). CRT curvature is 60% of the preset on desktop, 30% on phones
   (`crtCurvature`). Breakpoints re-render live via `useMedia`.
 - Shapes: `feedAspect` (TD 4:3; HKO 720×405 and YouTube 16:9). Groups that are all 16:9 get 16:9 cells (`wallAspect`);
   the pinned / full picture uses its own shape (`bigAspect`). "Wide" pin on short stages puts the picture left and
@@ -58,6 +58,13 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   `window.__crtFx = { on: true, t: 0.2 }` to freeze a moment for inspection. GLSL: never call smoothstep with descending edges.
 - i18n: `lib/i18n.ts` (en / zh-Hant). Primary language leads; the other language shows as secondary info wherever there is room.
   Feed OSD font is VT323 for Latin + Fusion Pixel 12px Monospaced TC (OFL, `@fontsource`) for Chinese.
+- News ticker: `src/pages/api/news.ts` relays fixed upstreams only (HKO warnsum JSON, TD special traffic news XML,
+  RTHK local RSS — RTHK has no CORS) as one JSON list per language; `lib/news.ts` polls it (3 min) for both views.
+  The DOM ticker (`components/deck/NewsTicker.tsx`) sits at the top of the viewer column (never over the sidebar);
+  in CRT mode it is drawn inside the tube by the compositor (`drawTicker`) and `crtLayout` reserves `CRT_NEWS_H`.
+  Toggle: NEWS (`news`, URL `news=0`).
+- Maps fly between locations (`flyView` / `tilesForView` in `lib/maptiles.ts`, used by `MiniMap` and the CRT map
+  inset): pan for short hops, zoom out–pan–in for long ones; the pin rides with the map.
 - `src/pages/api/snap.ts` — same-origin relay for HKO photos (no CORS upstream). Allow-listed station codes only.
 
 ## Design tokens

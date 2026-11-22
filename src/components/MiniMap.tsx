@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ATTRIBUTION, tilesFor } from "../lib/maptiles";
+import { ATTRIBUTION, FLIGHT_MS, flyView, pointIn, reducedMotion, tilesForView, viewOf, type MapView } from "../lib/maptiles";
 import { useT } from "../lib/i18n";
 
 interface Props {
@@ -7,6 +7,32 @@ interface Props {
   lon: number;
   approx: boolean;
   label: string;
+}
+
+/** Animated view: flies from wherever the map is to `target` whenever the target changes. */
+function useFlight(target: MapView, width: number): MapView {
+  const [view, setView] = useState(target);
+  const shown = useRef(target);
+  shown.current = view;
+  const key = `${target.x},${target.y},${target.z}`;
+  useEffect(() => {
+    const from = shown.current;
+    if (reducedMotion() || (from.x === target.x && from.y === target.y && from.z === target.z)) {
+      setView(target);
+      return;
+    }
+    const t0 = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const t = (now - t0) / FLIGHT_MS;
+      setView(t >= 1 ? target : flyView(from, target, t, width));
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return view;
 }
 
 export function MiniMap({ lat, lon, approx, label }: Props) {
@@ -24,14 +50,18 @@ export function MiniMap({ lat, lon, approx, label }: Props) {
     return () => ro.disconnect();
   }, []);
 
-  const tiles = tilesFor(lat, lon, zoom, size.w, size.h);
+  const target = viewOf(lat, lon, zoom);
+  const view = useFlight(target, size.w);
+  const tiles = tilesForView(view, size.w, size.h);
+  // The pin rides with the map to the new camera (it is only centred once the flight lands).
+  const pin = pointIn(view, target, size.w, size.h);
   return (
     <figure className="minimap" aria-label={`Map: ${label}`}>
       <div className="minimap-view" ref={ref}>
-        {tiles.map((t) => (
-          <img key={t.key} src={t.url} alt="" draggable={false} className="minimap-tile" style={{ left: t.left, top: t.top }} />
+        {tiles.map((tl) => (
+          <img key={tl.key} src={tl.url} alt="" draggable={false} className="minimap-tile" style={{ left: tl.left, top: tl.top, width: tl.size, height: tl.size }} />
         ))}
-        <div className={`minimap-pin${approx ? " approx" : ""}`} />
+        <div className={`minimap-pin${approx ? " approx" : ""}`} style={{ left: pin.x, top: pin.y }} />
         <div className="minimap-reticle" />
         <div className="minimap-zoom">
           <button type="button" onClick={() => setZoom((z) => Math.min(18, z + 1))} aria-label={t.zoomIn}>+</button>

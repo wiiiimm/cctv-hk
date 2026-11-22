@@ -4,7 +4,7 @@
 //
 //   ?g=featured&pg=2&wall=215,101,1101&pin=101&pm=wide&full=1&sel=1101&sz=160&crt=trinitron&lang=zh
 //    &patrol=0&seq=page&dwell=30&sound=1&theatre=1
-// Omitted = default: page 1, nothing pinned, console mode, patrol on, rolling, 10s, muted, sidebar shown.
+// Omitted = default: page 1, nothing pinned, console mode, patrol on, rolling, 10s, muted, sidebar shown, news on.
 //
 // Cameras are written as channel numbers. A custom group or favourites list is carried as its cameras (`gc`) and
 // name (`gn`) so it works on someone else's device: the receiver gets it as one of their own groups.
@@ -49,6 +49,7 @@ export function encodeView(s: State): string {
   if (s.patrolSec !== 10) q.set("dwell", String(s.patrolSec));
   if (!s.muted) q.set("sound", "1");
   if (s.theater) q.set("theatre", "1");
+  if (!s.news) q.set("news", "0");
   return q.toString().replace(/%2C/g, ",");
 }
 
@@ -99,6 +100,7 @@ export function applyView(base: State, search: string): { select?: string } {
   if ([5, 10, 15, 30, 60].includes(dwell)) base.patrolSec = dwell;
   base.muted = q.get("sound") !== "1";
   base.theater = q.get("theatre") === "1";
+  base.news = q.get("news") !== "0";
   return { select: keysOf(q.get("sel"))[0] };
 }
 
