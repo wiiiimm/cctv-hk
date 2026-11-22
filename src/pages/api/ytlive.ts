@@ -56,28 +56,22 @@ export const GET: APIRoute = async ({ url }) => {
   let recent: { id: string; title: string; published: string }[] = [];
   if (!conf.liveOnly)
     try {
-      const xml = await (
-        await fetch(
-          `https://www.youtube.com/feeds/videos.xml?channel_id=${ch}`,
-          { signal: AbortSignal.timeout(8000) },
-        )
-      ).text();
+      const fullPage = conf.replayDays === 0; // non-news: no age limit, a full page of the channel's videos
+      const [feed, page] = await Promise.all([rssVideos(ch), fullPage ? videosPage(ch).catch(() => []) : Promise.resolve([])]);
+      // Union (the feed has exact dates and recent past streams; the page has ~30 videos), newest first.
+      const seen = new Set<string>();
+      const all = [...feed, ...page]
+        .filter((v) => !seen.has(v.id) && (seen.add(v.id), true))
+        .sort((a, b) => Date.parse(b.published) - Date.parse(a.published));
       const match = conf.replayMatch ? new RegExp(conf.replayMatch, "i") : null;
       const exclude = conf.replayExclude ? new RegExp(conf.replayExclude, "i") : null;
-      recent = [
-        ...xml.matchAll(
-          /<entry>[\s\S]*?<yt:videoId>([\w-]{11})<\/yt:videoId>[\s\S]*?<title>([\s\S]*?)<\/title>[\s\S]*?<published>([^<]+)<\/published>/g,
-        ),
-      ]
-        .map(([, id, title, published]) => ({
-          id,
-          title: decode(title),
-          published,
-        }))
-        // Replays are recent content only: published within the last 48 hours (older → nothing to replay → OFF AIR).
-        .filter((v) => Date.now() - Date.parse(v.published) <= REPLAY_WINDOW_MS)
+      recent = all
+        // News: published within the last 48 hours (older → nothing to replay → OFF AIR). replayDays 0 = no limit.
+        .filter((v) => fullPage || Date.now() - Date.parse(v.published) <= (conf.replayDays ? conf.replayDays * 86_400_000 : REPLAY_WINDOW_MS))
         .filter((v) => v.id !== videoId && (!match || match.test(v.title)) && !(exclude && exclude.test(v.title)))
-        .slice(0, 10);
+        // Non-news: proper videos only — vertical #shorts come in through the feed (the Videos page leaves them out).
+        .filter((v) => !(fullPage && /#shorts/i.test(v.title)))
+        .slice(0, fullPage ? 30 : 15);
     } catch {
       /* no replay list this time */
     }
@@ -101,3 +95,55 @@ const json = (body: string, maxAge = 60) =>
       "cache-control": `public, max-age=${maxAge}, s-maxage=60`,
     },
   });
+
+type Video = { id: string; title: string; published: string };
+
+/** The channel's official feed: its latest 15 uploads (videos and past streams; never members-only), exact dates. */
+async function rssVideos(ch: string): Promise<Video[]> {
+  const xml = await (await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${ch}`, { signal: AbortSignal.timeout(8000) })).text();
+  return [...xml.matchAll(/<entry>[\s\S]*?<yt:videoId>([\w-]{11})<\/yt:videoId>[\s\S]*?<title>([\s\S]*?)<\/title>[\s\S]*?<published>([^<]+)<\/published>/g)].map(
+    ([, id, title, published]) => ({ id, title: decode(title), published }),
+  );
+}
+
+/**
+ * The first page of the channel's Videos tab (~30 videos, any age), skipping members-only ones. Dates there are only
+ * relative ("3 weeks ago"), so they are approximate.
+ */
+async function videosPage(ch: string): Promise<Video[]> {
+  const html = await (
+    await fetch(`https://www.youtube.com/channel/${ch}/videos`, {
+      headers: { "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36", "accept-language": "en" },
+      signal: AbortSignal.timeout(8000),
+    })
+  ).text();
+  const m = html.match(/var ytInitialData = (\{[\s\S]*?\});<\/script>/);
+  if (!m) return [];
+  const out: Video[] = [];
+  const walk = (o: unknown): void => {
+    if (Array.isArray(o)) return o.forEach(walk);
+    if (!o || typeof o !== "object") return;
+    const r = o as Record<string, any>;
+    const lockup = r.lockupViewModel;
+    const vr = r.videoRenderer;
+    if (lockup?.contentId || vr?.videoId) {
+      const s = JSON.stringify(lockup ?? vr);
+      if (!/MEMBERS_ONLY|Members only|members-only/i.test(s)) {
+        const id: string = lockup?.contentId ?? vr.videoId;
+        const title: string = lockup?.metadata?.lockupMetadataViewModel?.title?.content ?? (vr?.title?.runs ?? []).map((x: { text: string }) => x.text).join("");
+        const ago = s.match(/(\d+) (second|minute|hour|day|week|month|year)s? ago/);
+        if (id && title) out.push({ id, title, published: new Date(Date.now() - agoMs(ago)).toISOString() });
+      }
+      return;
+    }
+    Object.values(r).forEach(walk);
+  };
+  walk(JSON.parse(m[1]));
+  return out;
+}
+
+function agoMs(m: RegExpMatchArray | null): number {
+  if (!m) return 0;
+  const unit = { second: 1e3, minute: 6e4, hour: 36e5, day: 864e5, week: 6048e5, month: 2592e6, year: 31536e6 }[m[2]] ?? 0;
+  return Number(m[1]) * unit;
+}

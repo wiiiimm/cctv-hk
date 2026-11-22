@@ -27,13 +27,13 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
   const t = useT();
   const lang = useStore((s) => s.lang);
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const willPlay = ch?.kind === "yt" && allowVideo && !!snap.live;
+  const willPlay = ch?.kind === "yt" && !ch.noEmbed && allowVideo && !!snap.live;
   // Players load muted (autoplay is allowed); the hook starts playback and unmutes the one that should have sound.
   useYouTubeErrors(frameRef, channelKey, willPlay, !muted);
   if (!ch) return <div className="tile" />;
 
   const isVideo = ch.kind === "yt";
-  const playing = isVideo && allowVideo && snap.live;
+  const playing = isVideo && !ch.noEmbed && allowVideo && snap.live;
   const noSignal = snap.status === "error" || snap.status === "offline";
   const stale = !isVideo && snap.takenAt && now - snap.takenAt > ch.refreshMs * 3;
   // Recording slots show the recording's own title, with the slot name ("無綫新聞 重溫 1") as the second line.
@@ -125,7 +125,21 @@ export const Tile = memo(function Tile({ pinRole, index, channelKey, selected, l
           </div>
         </>
       )}
-      {isVideo && !playing && snap.live && <div className="tile-play">▶</div>}
+      {isVideo && !playing && snap.live && !ch.noEmbed && <div className="tile-play">▶</div>}
+      {/* Owner blocks playback on other sites: offer the video on YouTube instead of a player. */}
+      {isVideo && ch.noEmbed && snap.videoId && (
+        <a
+          className="tile-yt-link"
+          href={`https://www.youtube.com/watch?v=${snap.videoId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          title={t.watchOnYouTubeTitle}
+        >
+          {t.watchOnYouTube}
+        </a>
+      )}
       {pinRole && <PinControls role={pinRole} index={index} />}
       {/* Selection indicator: drawn above the picture (an outline on the tile itself sits underneath it). */}
       {selected && (

@@ -73,7 +73,12 @@ export function useYouTubeErrors(ref: RefObject<HTMLIFrameElement | null>, chann
       } catch {
         return;
       }
-      if (data?.event === "onError" && UNAVAILABLE.has(Number(data.info))) markUnavailable(channelKey);
+      if (data?.event === "onError") {
+        // Any player error means it won't play here (known: 2, 5, 100, 101, 150; newer players also send others).
+        // Logged so a broadcaster-specific refusal can be identified from the browser console.
+        console.info("[yt] error", Number(data.info), channelKey, UNAVAILABLE.has(Number(data.info)) ? "" : "(unlisted code)");
+        markUnavailable(channelKey);
+      }
       if (data?.event === "onReady") {
         ready = true;
         kick();

@@ -75,13 +75,21 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   When nothing (playable) is live it replays the channel's uploads from the last 48 hours (official RSS) filtered by
   `replayMatch`,
   as a looping playlist with a REPLAY badge — also when a live stream is blocked here. `liveOnly` (webcams) never
-  replays: OFF AIR instead. Used for TVB / RTHK / Cable News, HOY programmes, taxi dashcams, a harbour cam, racing. Racing (4xx, `racing: true`)
+  replays: OFF AIR instead. Used for RTHK / Cable News, HOY programmes, taxi dashcams, a harbour cam, racing. Racing (4xx, `racing: true`)
   is never in the news groups: region "Racing", its own "Horse racing" topic group.
-- Recorded news (bank 6xx, `RECORDING_SOURCES`): numbered slots (TVB 601–610, Cable 611–620, RTHK 621–630) that hold
+- Recorded news (bank 6xx, `RECORDING_SOURCES`): numbered slots (Cable 611–620, RTHK 621–630; 601–610 retired with TVB) that hold
   a followed channel's Nth most recent recording from the same news / last-48h list (`Channel.recIndex`). Tiles show
-  the recording's title (`Snap.title`) and air time; empty slots are OFF AIR. Group "Hong Kong news recordings / 香港新聞重溫", right under "Hong Kong news".
+  the recording's title (`Snap.title`) and air time; empty slots are OFF AIR. Non-news sources (`replayDays: 0`) live in
+  3000+, 40 numbers each ([live channel] + up to 30 slots, 10 for studio trailers) and use a full page of the channel's
+  Videos tab (~30, any age, members-only skipped) merged with its feed. Group flags: `group` (own Topics group),
+  `entertainment` → "Hong Kong entertainment" (+ HOY 116), `tech` → "Hong Kong tech", `crime` → "Crime & mystery",
+  `film` → "Movies" (studios filtered to trailers via `replayMatch`). JFFLive is a single live-only channel. All these
+  groups sit in the picker's "YouTube content / YouTube 內容" section. Group "Hong Kong news recordings / 香港新聞重溫", right under "Hong Kong news".
 - Channel list rows for video channels show the state (LIVE / REPLAY / OFF AIR / N/A) via `useListStatus`, which
   never starts polling: on-wall snapshot, else the followed channel's cached lookup, else a 24/7 stream is assumed live.
+- `noEmbed` (unused now; TVB 454 / 601–610 were removed for it): for an owner that refuses playback on other sites
+  (player error 150) although YouTube's data says embeddable — tiles show the still + "YouTube ↗" link, never a player. Any other player
+  error also marks a video unavailable and is logged to the console as `[yt] error <code> <channel>`.
 - YouTube off-air reasons (`Snap.reason`): "offair" = not broadcasting (OFF AIR); "blocked" = the owner won't let it
   play here (UNAVAILABLE + "May be region-restricted").
 - CRT veil: the live layers (players, flat overlay, flat ticker) hide during power-on (mount / refresh / entering CRT)

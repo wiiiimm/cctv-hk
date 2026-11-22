@@ -411,6 +411,9 @@ kbd { font: 500 var(--fs-xs) / 1.5 var(--mono); padding: 0 5px; border: 1px soli
 .osd .badge { background: #d71f1f; color: #fff; padding: 1px 5px 2px; text-shadow: none; letter-spacing: 0.04em; }
 .osd .badge.stale, .osd .badge.replay { background: #c27c00; }
 .osd .age { color: var(--sel); }
+/* No-embed channels (e.g. TVB): a button to watch on YouTube, over the still. */
+.tile-yt-link { position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: 3; padding: 6px 12px; border-radius: 4px; background: rgba(0, 0, 0, 0.8); color: #fff; font: 600 13px var(--sans); text-decoration: none; border: 1px solid rgba(255, 255, 255, 0.35); white-space: nowrap; }
+.tile-yt-link:hover { background: #c00; border-color: #c00; }
 .tile-play { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; color: rgba(255, 255, 255, 0.8); text-shadow: 0 0 12px #000; pointer-events: none; }
 @container (max-width: 300px) { .osd-stamp { display: none; } }
 @container (max-height: 110px) { .osd-bottom { display: none; } }

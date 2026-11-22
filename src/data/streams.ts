@@ -31,6 +31,7 @@ export const LIVE_STREAMS: LiveStream[] = [
   { num: 120, id: "follow-hkairportlivecam", follow: "UCs3H75ak0L_iVLSmXwTORyQ", liveOnly: true, name: "Hong Kong Airport live cam", nameZh: "香港機場直播鏡頭", channel: "Hong Kong Airport Live Cam", lat: 22.308, lon: 113.9185 },
   { num: 119, id: "follow-shunshunlee", follow: "UCAyQys2w6IkGrqkJyHe-4sQ", liveOnly: true, name: "Victoria Harbour East", nameZh: "維多利亞港東面", channel: "劉博 Eric Lau", lat: 22.2905, lon: 114.2055 },
   { num: 117, id: "follow-dicgor", follow: "UCd14rUv839ARn76QULWoUdw", replayMatch: "的士直播|Taxi Live", name: "Taxi cam: DicGor", nameZh: "的士直播：DicGor", channel: "60後吃喝玩樂 DicGor" },
+  { num: 121, id: "follow-captainlam", follow: "UCyOlZ-B64TR9uqHkQlrjNZA", replayMatch: "的士直播|Taxi Live", name: "Taxi cam: Captain Lam", nameZh: "的士直播：Captain Lam", channel: "Captain Lam" },
   { num: 118, id: "follow-hktaxico", follow: "UCit3D7siKGfDPT5OaehBVpg", replayMatch: "的士直播|Taxi Live", name: "Taxi cam: HKtaxico", nameZh: "的士直播：香港的伯高", channel: "香港的伯高 HKtaxico" },
   { num: 116, id: "follow-hkhoy", follow: "UCutSfYmIwdDOb4Ba7ObcaAQ", name: "HOY TV programmes (latest)", nameZh: "HOY 節目（最新）", channel: "HOY媒體網絡", lat: 22.3712, lon: 114.1123 },
   { num: 115, id: "g8GNxQBRff4", name: "Prince Edward view", nameZh: "太子景觀", channel: "香港天氣台", lat: 22.3245, lon: 114.1685 },
@@ -147,6 +148,11 @@ export interface NewsStream {
   replayMatch?: string;
   /** …and never replay uploads whose title matches this (for channels whose news clips have no common keyword). */
   replayExclude?: string;
+  /**
+   * The owner blocks playback on other websites (even though YouTube's data says embeddable): never load a player —
+   * show the still with a "YouTube ↗" link instead.
+   */
+  noEmbed?: boolean;
   /** Estimated position (approximate): the named place, else the broadcaster's base / the country's main city. */
   lat?: number;
   lon?: number;
@@ -160,7 +166,7 @@ export const NEWS_STREAMS: NewsStream[] = [
   { num: 402, id: "0i7n3r01L2U", name: "CGTN", nameZh: "中國環球電視網 CGTN", channel: "CGTN", country: "China", countryZh: "中國", lang: "en", apac: true, lat: 39.9042, lon: 116.4074 },
   { num: 452, id: "follow-hoy78cablenews", follow: "UC_q7e5XYJB0JDGagcF0KW0w", replayMatch: "新聞", name: "Cable News (HOY 78)", nameZh: "有線新聞 HOY 78", channel: "HOY 78 × 有線新聞 Cable News", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, lat: 22.3712, lon: 114.1123 },
   { num: 453, id: "follow-rthk", follow: "UC6of7UYhctnYmqABjUqzuxw", replayExclude: "香港故事|世界技能|足本重溫", name: "RTHK news (hourly briefs & live events)", nameZh: "香港電台新聞（新聞簡報及現場直播）", channel: "RTHK 香港電台", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, lat: 22.3376, lon: 114.1805 },
-  { num: 454, id: "follow-tvbnews", follow: "UC_ifDTtFAcsj-wJ5JfM27CQ", replayMatch: "新聞|News", name: "TVB News (live & latest)", nameZh: "無綫新聞（直播及最新）", channel: "TVB NEWS Official 無綫新聞", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, lat: 22.278, lon: 114.2693 },
+  { num: 458, id: "follow-hk01", follow: "UCTxyBu9VWUq5LXezXwy_SGg", replayMatch: "新聞|01國際", name: "HK01 news", nameZh: "香港01 新聞", channel: "香港01", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, lat: 22.287, lon: 114.213 },
   // Horse racing: race-day live shows and tips programmes; replays keep to racing (Fightclub also streams football).
   { num: 455, id: "follow-whr-hk", follow: "UCSuzEzGo0zIK0wcpr8j46QQ", replayMatch: "賽馬", name: "WHR horse racing", nameZh: "贏跑賽馬台", channel: "贏跑賽馬台 WHR-HK", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, racing: true, lat: 22.4006, lon: 114.2036 },
   { num: 456, id: "follow-fightclub-903", follow: "UCUdSiDWBtPZExreighMVfdQ", replayMatch: "賽馬", name: "Fightclub horse racing", nameZh: "博擊會 賽馬", channel: "博擊會 Fightclub", country: "Hong Kong", countryZh: "香港", lang: "yue", apac: true, racing: true, lat: 22.4006, lon: 114.2036 },
@@ -274,12 +280,15 @@ export const SPACE_STREAMS: SpaceStream[] = [
 ];
 
 /** Channels we follow (allow-list for /api/ytlive), with their replay title filter. */
-export function followedChannels(): { id: string; replayMatch?: string; replayExclude?: string; liveOnly?: boolean }[] {
-  return [...LIVE_STREAMS, ...NEWS_STREAMS].flatMap((s) =>
+export function followedChannels(): { id: string; replayMatch?: string; replayExclude?: string; liveOnly?: boolean; replayDays?: number }[] {
+  const out: { id: string; replayMatch?: string; replayExclude?: string; liveOnly?: boolean; replayDays?: number }[] = [...LIVE_STREAMS, ...NEWS_STREAMS].flatMap((s) =>
     s.follow
       ? [{ id: s.follow, replayMatch: s.replayMatch, replayExclude: "replayExclude" in s ? s.replayExclude : undefined, liveOnly: "liveOnly" in s ? s.liveOnly : undefined }]
       : [],
   );
+  for (const r of RECORDING_SOURCES)
+    if (!out.some((o) => o.id === r.follow)) out.push({ id: r.follow, replayMatch: r.replayMatch, replayExclude: undefined, liveOnly: r.liveOnly, replayDays: r.replayDays });
+  return out;
 }
 
 /**
@@ -294,12 +303,79 @@ export interface RecordingSource {
   name: string;
   nameZh: string;
   slots: number;
+  /** See NewsStream.noEmbed. */
+  noEmbed?: boolean;
+  /** Days of uploads to use (default 2 — news). 0 = no limit: simply the most recent (YouTube's feed lists 15). */
+  replayDays?: number;
+  /** Only uploads whose title matches (regex source). */
+  replayMatch?: string;
+  /**
+   * Not news: the slots get their own group (listed with the topics) instead of "Hong Kong news recordings".
+   */
+  group?: { id: string; label: string; labelZh: string };
+  /** Also a "live" channel at `base` (live show when on air, else its latest videos looping); slots then start at base + 1. */
+  live?: boolean;
+  /** The live channel only ever plays what is live (OFF AIR otherwise, no replays). */
+  liveOnly?: boolean;
+  /** Part of "Hong Kong entertainment". */
+  entertainment?: boolean;
+  /** Part of "Hong Kong tech". */
+  tech?: boolean;
+  /** Part of "Crime & mystery". */
+  crime?: boolean;
+  /** Part of "Movies" (film releases and trailers). */
+  film?: boolean;
   lat?: number;
   lon?: number;
 }
 
+// TVB News (UC_ifDTtFAcsj-wJ5JfM27CQ) was 454 + recordings 601–610: removed 2026-11-22 — TVB refuses playback on other
+// websites (player error 150) although YouTube's data says embeddable. Don't reuse those numbers.
+// Numbering: news recordings 6xx (10 slots each). Everything else (replayDays 0: no age limit, a full page of the
+// channel's videos) sits in 3000+, 40 numbers per channel: [live channel] then up to 30 video slots (10 for studios
+// whose trailers are filtered out of mostly-social uploads).
 export const RECORDING_SOURCES: RecordingSource[] = [
-  { base: 601, slug: "tvb", follow: "UC_ifDTtFAcsj-wJ5JfM27CQ", name: "TVB News", nameZh: "無綫新聞", slots: 10, lat: 22.278, lon: 114.2693 },
   { base: 611, slug: "cable", follow: "UC_q7e5XYJB0JDGagcF0KW0w", name: "Cable News", nameZh: "有線新聞", slots: 10, lat: 22.3712, lon: 114.1123 },
   { base: 621, slug: "rthk", follow: "UC6of7UYhctnYmqABjUqzuxw", name: "RTHK News", nameZh: "香港電台新聞", slots: 10, lat: 22.3376, lon: 114.1805 },
+  { base: 631, slug: "hk01", follow: "UCTxyBu9VWUq5LXezXwy_SGg", name: "HK01 News", nameZh: "香港01 新聞", slots: 10, lat: 22.287, lon: 114.213 },
+  // Members-only videos never appear in YouTube's feed (checked 2026-11-22), so these slots only get public videos.
+  // Mill MILK (MM): Hong Kong lifestyle / culture magazine, ~1 video a day — its own group, its latest videos (any age).
+  { base: 3000, slug: "mm", follow: "UCa1d9ZXVMU0BZQRXZHt8Cpw", name: "Mill MILK video", nameZh: "Mill MILK 影片", slots: 30, replayDays: 0, entertainment: true, group: { id: "mm", label: "Mill MILK (MM)", labelZh: "Mill MILK 牛奶" } },
+  // Pomato 小薯茄: Hong Kong comedy / variety channel — its own group, its latest videos (any age).
+  { base: 3040, slug: "pomato", follow: "UCHQoZ0_MHDXIgWeRvPTLTJw", name: "Pomato video", nameZh: "小薯茄 影片", slots: 30, replayDays: 0, entertainment: true, group: { id: "pomato", label: "Pomato 小薯茄", labelZh: "小薯茄 Pomato" } },
+  // 香城映画 Utopia Pictures: comedy sketches + occasional long live shows — a live channel, then its latest videos.
+  // HEBEFACE: Hong Kong celebrity interviews / entertainment — its own group, also in Hong Kong entertainment.
+  { base: 4040, slug: "hebeface", follow: "UCr9O9uLhxnB5GQenVseEAnA", name: "HEBEFACE", nameZh: "HEBEFACE", slots: 30, replayDays: 0, entertainment: true, group: { id: "hebeface", label: "HEBEFACE", labelZh: "HEBEFACE" } },
+  // 杜汶澤喱騷 Chapman To's Lateshow: talk / variety — its own group, also in Hong Kong entertainment.
+  { base: 4080, slug: "chapmanto", follow: "UCU5MOgUdLqitxKZRZy9vnnw", name: "Chapman To's Lateshow", nameZh: "杜汶澤喱騷", slots: 30, replayDays: 0, entertainment: true, group: { id: "chapmanto", label: "Chapman To's Lateshow", labelZh: "杜汶澤喱騷" } },
+  { base: 3080, slug: "utopia", follow: "UCdkc0tlDWdq7zeLIYOnAY-w", name: "Utopia Pictures", nameZh: "香城映画", slots: 30, replayDays: 0, live: true, entertainment: true, group: { id: "utopia", label: "Utopia Pictures 香城映画", labelZh: "香城映画 Utopia Pictures" } },
+  // Hong Kong tech reviewers (Cantonese): their latest videos (a full page each), in the "Hong Kong tech" group.
+  { base: 3160, slug: "unwire", follow: "UCNAqBC6Z1HkymQ7gkG0pCOg", name: "UNWIRE.HK", nameZh: "UNWIRE.HK", slots: 30, replayDays: 0, tech: true },
+  { base: 3200, slug: "karenly", follow: "UCBwfrMS785JyWDUBRhOQkjw", name: "Karenly", nameZh: "Karenly", slots: 30, replayDays: 0, tech: true },
+  { base: 3240, slug: "pinkytalks", follow: "UCm5oNp5xqr4CdtU9L7ZrsKg", name: "Pinky Talks", nameZh: "Pinky Talks", slots: 30, replayDays: 0, tech: true },
+  { base: 3280, slug: "edwinh", follow: "UCZGVB6g74LXWtkR3fX50ykg", name: "Edwin H.", nameZh: "Edwin H.", slots: 30, replayDays: 0, tech: true },
+  // Crime & mystery (Cantonese true crime, case files, ghost stories): latest videos (a full page each); 危險人物 2.0 also
+  // has a live channel. Mr. Atom hadn't posted for ~6 months when added (its slots show older videos).
+  { base: 3320, slug: "mratom", follow: "UCjxWY5oD9I1LKaCJkOO1TKw", name: "Mr. Atom", nameZh: "原子檔案", slots: 30, replayDays: 0, crime: true },
+  { base: 3360, slug: "zfivesir", follow: "UCIraGjqGxcks1NeVA8P4gAA", name: "Z Files", nameZh: "Z檔案", slots: 30, replayDays: 0, crime: true },
+  { base: 3400, slug: "ahma", follow: "UCwWU6_nyg2diQljrg1yDZHA", name: "Ah Ma You Gui", nameZh: "阿媽 有詭!", slots: 30, replayDays: 0, crime: true },
+  { base: 3440, slug: "radio90s", follow: "UCU0VbPy8O8cl8rdrEAofYdw", name: "Radio 90s", nameZh: "90電台越講粵有", slots: 30, replayDays: 0, crime: true },
+  { base: 3480, slug: "patstrick", follow: "UCRJng4k0CocF67PE6FK0nAg", name: "The Pat's Trick", nameZh: "鄧健泓 石詠莉", slots: 30, replayDays: 0, crime: true },
+  { base: 3520, slug: "estateboy", follow: "UCLsioo0gVwZgoMwCafx914A", name: "Afternoon Files", nameZh: "午後檔案", slots: 30, replayDays: 0, crime: true },
+  { base: 3560, slug: "dangerousperson", follow: "UCAlVuubC3GE6kFFeNBEkoUQ", name: "Dangerous Person 2.0", nameZh: "危險人物 2.0", slots: 30, replayDays: 0, live: true, crime: true },
+  // Movies (film releases): HK / AU distributors' latest videos (all release material, a full page); the big studios post mostly
+  // social clips, so only their trailers / teasers (up to 10 each; slots are OFF AIR when a studio has none on its page).
+  { base: 3600, slug: "goldenscene", follow: "UCxIdoIporTzf2wdpFvCXRiQ", name: "Golden Scene", nameZh: "高先電影", slots: 30, replayDays: 0, film: true },
+  { base: 3640, slug: "edko", follow: "UCxOXYny2PDQYrS3QGSzFosg", name: "Edko Films", nameZh: "安樂影片", slots: 30, replayDays: 0, film: true },
+  { base: 3680, slug: "roadshow", follow: "UCSi5779nMiFTbLm3prHaa1g", name: "Roadshow Films", nameZh: "Roadshow Films", slots: 30, replayDays: 0, film: true },
+  { base: 3760, slug: "netflix", follow: "UCWOA1ZGywLbqmigxE4Qlvuw", name: "Netflix trailer", nameZh: "Netflix 預告", slots: 10, replayDays: 0, replayMatch: "official trailer|teaser|final trailer|預告", film: true },
+  { base: 3800, slug: "universal", follow: "UCq0OueAsdxH6b8nyAspwViw", name: "Universal trailer", nameZh: "環球影業 預告", slots: 10, replayDays: 0, replayMatch: "official trailer|teaser|final trailer|預告", film: true },
+  { base: 3840, slug: "sony", follow: "UCz97F7dMxBNOfGYu3rx8aCw", name: "Sony Pictures trailer", nameZh: "索尼影業 預告", slots: 10, replayDays: 0, replayMatch: "official trailer|teaser|final trailer|預告", film: true },
+  { base: 3880, slug: "neon", follow: "UCpy5dRhZd-JbZP4NsrnLt1w", name: "NEON trailer", nameZh: "NEON 預告", slots: 10, replayDays: 0, replayMatch: "official trailer|teaser|final trailer|預告", film: true },
+  { base: 3920, slug: "appletv", follow: "UC1Myj674wRVXB9I4c6Hm5zA", name: "Apple TV trailer", nameZh: "Apple TV 預告", slots: 10, replayDays: 0, replayMatch: "official trailer|teaser|final trailer|預告", film: true },
+  { base: 3960, slug: "20thcentury", follow: "UC2-BeLxzUBSs0uSrmzWhJuQ", name: "20th Century trailer", nameZh: "20世紀影業 預告", slots: 10, replayDays: 0, replayMatch: "official trailer|teaser|final trailer|預告", film: true },
+  { base: 4000, slug: "warnerbros", follow: "UCjmJDM5pRKbUlVIzDYYWb6g", name: "Warner Bros. trailer", nameZh: "華納兄弟 預告", slots: 10, replayDays: 0, replayMatch: "official trailer|teaser|final trailer|預告", film: true },
+  { base: 3720, slug: "onecool", follow: "UCwwlkw15zKcqPeUHvgdteNw", name: "One Cool Film", nameZh: "天下一電影", slots: 30, replayDays: 0, film: true },
+  // JFFLive: near-daily live streams — just one live-only channel in Hong Kong entertainment; no group, no slots.
+  { base: 3120, slug: "jfflive", follow: "UC3aipgNToMvs2pFaQyaM_hg", name: "JFFLive", nameZh: "JFFLive", slots: 0, live: true, liveOnly: true, entertainment: true },
 ];

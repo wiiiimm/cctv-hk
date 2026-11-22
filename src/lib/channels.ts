@@ -22,6 +22,8 @@ export interface Channel {
   follow?: string;
   /** Recording slot: play the followed channel's Nth (0-based) most recent recording rather than its live stream. */
   recIndex?: number;
+  /** Owner blocks playback on other sites: show the still + "YouTube ↗", never a player. */
+  noEmbed?: boolean;
   /** How often the source publishes a new picture. */
   refreshMs: number;
 }
@@ -31,7 +33,7 @@ export interface ChannelGroup {
   label: string;
   labelZh: string;
   /** Where it is listed in the group picker. */
-  section: "type" | "topic" | "news" | "region" | "district" | "custom";
+  section: "type" | "topic" | "news" | "youtube" | "region" | "district" | "custom";
   keys: string[];
 }
 
@@ -41,24 +43,43 @@ function build(): Channel[] {
   const out: Channel[] = [];
   // Bank 1xx: HK live video. 2xx: HKO weather. 3xx: world live video. 4xx: news & finance. 5xx: space. 1000+: traffic.
   // Bank 6xx: recorded-news slots (see RECORDING_SOURCES).
-  for (const r of RECORDING_SOURCES)
+  for (const r of RECORDING_SOURCES) {
+    if (r.live)
+      out.push({
+        key: `yt:rec-${r.slug}-live`,
+        num: r.base,
+        kind: "yt",
+        code: `rec-${r.slug}-live`,
+        follow: r.follow, // a followed channel: live when on air, else its latest videos
+        name: `${r.name} live`,
+        nameZh: `${r.nameZh} 直播`,
+        region: r.group ? r.group.label : r.film ? "Movies" : r.crime ? "Crime & mystery" : r.tech ? "Tech" : r.entertainment ? "Entertainment" : "Recorded",
+        regionZh: r.group ? r.group.labelZh : r.film ? "電影" : r.crime ? "罪案及懸疑" : r.tech ? "科技" : r.entertainment ? "娛樂" : "重溫",
+        district: r.name,
+        districtZh: r.nameZh,
+        refreshMs: 0,
+      });
     for (let k = 0; k < r.slots; k++)
       out.push({
         key: `yt:rec-${r.slug}-${k + 1}`,
-        num: r.base + k,
+        num: r.base + (r.live ? 1 : 0) + k,
         kind: "yt",
         code: `rec-${r.slug}-${k + 1}`,
         follow: r.follow,
         recIndex: k,
-        name: `${r.name} recording ${k + 1}`,
-        nameZh: `${r.nameZh} 重溫 ${k + 1}`,
-        region: "Recorded",
-        regionZh: "重溫",
+        noEmbed: r.noEmbed,
+        // News: "RTHK News recording 3 / 香港電台新聞 重溫 3"; a channel group: "Mill MILK video 3 / Mill MILK 影片 3".
+        name: r.group || r.tech || r.entertainment || r.crime || r.film ? `${r.name} ${k + 1}` : `${r.name} recording ${k + 1}`,
+        nameZh: r.group || r.tech || r.entertainment || r.crime || r.film ? `${r.nameZh} ${k + 1}` : `${r.nameZh} 重溫 ${k + 1}`,
+        // News recordings share the "Recorded" region (their group); a source with its own group uses its name.
+        region: r.group ? r.group.label : r.film ? "Movies" : r.crime ? "Crime & mystery" : r.tech ? "Tech" : r.entertainment ? "Entertainment" : "Recorded",
+        regionZh: r.group ? r.group.labelZh : r.film ? "電影" : r.crime ? "罪案及懸疑" : r.tech ? "科技" : r.entertainment ? "娛樂" : "重溫",
         district: r.name,
         districtZh: r.nameZh,
         geo: r.lat != null && r.lon != null ? { lat: r.lat, lon: r.lon, approx: true } : undefined,
         refreshMs: 0,
       });
+  }
   SPACE_STREAMS.forEach((s) =>
     out.push({
       key: `yt:${s.id}`,
@@ -82,6 +103,7 @@ function build(): Channel[] {
       kind: "yt",
       code: s.id,
       follow: s.follow,
+      noEmbed: s.noEmbed,
       name: s.name,
       nameZh: s.nameZh,
       region: s.racing ? "Racing" : "News",
@@ -176,7 +198,7 @@ function locate(channels: Channel[]): Channel[] {
   const td = channels.filter((c) => c.kind === "td" && c.geo);
   return channels.map((c) => {
     // Only Hong Kong feeds take the nearest HK district; world / news / space keep their own country / place.
-    if (c.kind === "td" || !c.geo || ["World", "News", "Space", "Racing", "Recorded"].includes(c.region)) return c;
+    if (c.kind === "td" || !c.geo || c.code.startsWith("rec-") || ["World", "News", "Space", "Racing", "Recorded"].includes(c.region)) return c;
     let best = td[0];
     let bestD = Infinity;
     for (const t of td) {
@@ -271,7 +293,7 @@ const TOPICS: { id: string; label: string; labelZh: string; keys: string[]; matc
     match: /HZMB|TM-CLK Tunnel Southern Portal|Tung Wing Road|North Lantau Highway near (Tung Chung|Caribbean Coast|Ying Tung)/,
   },
   // Live dashcams of Hong Kong taxis on shift (followed channels: live when driving, else a recent drive).
-  { id: "taxi", label: "Taxi cams", labelZh: "的士直播", keys: ["yt:follow-dicgor", "yt:follow-hktaxico"] },
+  { id: "taxi", label: "Taxi cams", labelZh: "的士直播", keys: ["yt:follow-dicgor", "yt:follow-hktaxico", "yt:follow-captainlam"] },
   { id: "tunnels", label: "Tunnels", labelZh: "隧道", keys: [], match: /Tunnel/ },
   { id: "bridges", label: "Bridges", labelZh: "橋樑", keys: [], match: /Bridge|Tsing Ma|Ting Kau|Stonecutters|Kap Shui Mun|Lantau Link/ },
   { id: "border", label: "Border crossings", labelZh: "邊境口岸", keys: [], match: /Shenzhen Bay|Heung Yuen Wai|HZMB|Man Kam To|Lok Ma Chau|Lo Wu|San Tin/ },
@@ -307,11 +329,55 @@ function buildGroups(): ChannelGroup[] {
   const groups: ChannelGroup[] = [
     { id: "featured", section: "type", label: "Featured", labelZh: "精選", keys: featured() },
     { id: "all", section: "type", label: "All channels", labelZh: "所有頻道", keys: keysOf(CHANNELS) },
-    { id: "kind:yt", section: "type", label: "Live video", labelZh: "直播影像", keys: keysOf(CHANNELS.filter((c) => c.kind === "yt" && !["World", "News", "Space", "Racing", "Recorded"].includes(c.region))) },
+    { id: "kind:yt", section: "type", label: "Live video", labelZh: "直播影像", keys: keysOf(CHANNELS.filter((c) => c.kind === "yt" && !c.code.startsWith("rec-") && !["World", "News", "Space", "Racing", "Recorded"].includes(c.region))) },
     { id: "world", section: "type", label: "World live", labelZh: "世界直播", keys: keysOf(CHANNELS.filter((c) => c.region === "World")) },
     { id: "space", section: "type", label: "Space", labelZh: "太空直播", keys: keysOf(CHANNELS.filter((c) => c.region === "Space")) },
     // News & finance (bank 4xx), by audience.
     ...newsGroups(),
+    // Hong Kong entertainment: HOY TV programmes plus every entertainment channel with its own group (Mill MILK,
+    // Pomato, 香城映画, JFFLive…), then each of those on its own.
+    {
+      id: "hk-entertainment",
+      section: "youtube" as const,
+      label: "Hong Kong entertainment",
+      labelZh: "香港娛樂",
+      keys: [
+        "yt:follow-hkhoy",
+        ...RECORDING_SOURCES.filter((r) => r.entertainment).flatMap((r) => CHANNELS.filter((c) => c.code.startsWith(`rec-${r.slug}-`)).map((c) => c.key)),
+      ].filter((k) => CHANNEL_BY_KEY.has(k)),
+    },
+    // Hong Kong tech reviewers' latest videos.
+    {
+      id: "hk-tech",
+      section: "youtube" as const,
+      label: "Hong Kong tech",
+      labelZh: "香港科技",
+      keys: RECORDING_SOURCES.filter((r) => r.tech).flatMap((r) => CHANNELS.filter((c) => c.code.startsWith(`rec-${r.slug}-`)).map((c) => c.key)),
+    },
+    // Cantonese true crime, case files and ghost stories.
+    {
+      id: "crime",
+      section: "youtube" as const,
+      label: "Crime & mystery",
+      labelZh: "罪案及懸疑",
+      keys: RECORDING_SOURCES.filter((r) => r.crime).flatMap((r) => CHANNELS.filter((c) => c.code.startsWith(`rec-${r.slug}-`)).map((c) => c.key)),
+    },
+    // Film releases: distributors' latest videos and the studios' trailers.
+    {
+      id: "movies",
+      section: "youtube" as const,
+      label: "Movies",
+      labelZh: "電影",
+      keys: RECORDING_SOURCES.filter((r) => r.film).flatMap((r) => CHANNELS.filter((c) => c.code.startsWith(`rec-${r.slug}-`)).map((c) => c.key)),
+    },
+    // Recording sources with their own group (e.g. Mill MILK), listed with the topics.
+    ...RECORDING_SOURCES.filter((r) => r.group).map((r) => ({
+      id: r.group!.id,
+      section: "youtube" as const,
+      label: r.group!.label,
+      labelZh: r.group!.labelZh,
+      keys: CHANNELS.filter((c) => c.code.startsWith(`rec-${r.slug}-`)).map((c) => c.key),
+    })),
     // Horse racing (bank 4xx too, but not news): its own group, listed with the topics.
     {
       id: "racing",

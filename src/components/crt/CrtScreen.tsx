@@ -78,7 +78,10 @@ function CrtYouTube({ chKey, rect, muted, big, preset, switchedAt, veiled }: { c
  * unavailable streams are left to the canvas, which draws the OFF AIR screen like any other dead feed.
  */
 function videoCells(s: { cells: string[]; pinned: boolean; focused: boolean; selected: number; autoplay: boolean }, shown: number): number[] {
-  const isLiveYt = (key: string) => CHANNEL_BY_KEY.get(key)?.kind === "yt" && !!getSnap(key).live;
+  const isLiveYt = (key: string) => {
+    const c = CHANNEL_BY_KEY.get(key);
+    return c?.kind === "yt" && !c.noEmbed && !!getSnap(key).live; // no-embed channels stay a still on the canvas
+  };
   if (s.focused) return isLiveYt(s.cells[s.selected]) ? [s.selected] : [];
   const out: number[] = [];
   // The pinned and the selected video always play; other previews only with AUTOPLAY on, and at most
