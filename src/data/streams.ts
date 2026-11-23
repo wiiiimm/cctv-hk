@@ -360,6 +360,7 @@ export const RECORDING_SOURCES: RecordingSource[] = [
   { base: 3200, slug: "karenly", follow: "UCBwfrMS785JyWDUBRhOQkjw", name: "Karenly", nameZh: "Karenly", slots: 30, replayDays: 0, tech: true },
   { base: 3240, slug: "pinkytalks", follow: "UCm5oNp5xqr4CdtU9L7ZrsKg", name: "Pinky Talks", nameZh: "Pinky Talks", slots: 30, replayDays: 0, tech: true },
   { base: 3280, slug: "edwinh", follow: "UCZGVB6g74LXWtkR3fX50ykg", name: "Edwin H.", nameZh: "Edwin H.", slots: 30, replayDays: 0, tech: true },
+  { base: 4120, slug: "pricehk", follow: "UCUEJok-GiWaGlv5nIPwk-GQ", name: "Price.com.hk", nameZh: "香港格價網", slots: 30, replayDays: 0, tech: true },
   // Crime & mystery (Cantonese true crime, case files, ghost stories): latest videos (a full page each); 危險人物 2.0 also
   // has a live channel. Mr. Atom hadn't posted for ~6 months when added (its slots show older videos).
   { base: 3320, slug: "mratom", follow: "UCjxWY5oD9I1LKaCJkOO1TKw", name: "Mr. Atom", nameZh: "原子檔案", slots: 30, replayDays: 0, crime: true },
