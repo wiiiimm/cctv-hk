@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { track } from "@vercel/analytics";
 
 /** How long the CRT stays mounted after switch-off so the collapse-to-dot can play. */
 const CRT_OFF_MS = 950;
 import { SITE } from "../lib/site";
 import { actions, useStore } from "../lib/store";
+import { CHANNEL_BY_KEY } from "../lib/channels";
 import { useControls } from "../hooks/useControls";
 import { TopBar } from "./deck/TopBar";
 import { Sidebar } from "./deck/Sidebar";
@@ -21,6 +23,14 @@ export default function App() {
   useControls();
   // Offline support: service worker (production only) + offline / update notices.
   useEffect(() => initPwa(), []);
+  const pinnedChannel = useStore((s) => s.pinned ? CHANNEL_BY_KEY.get(s.cells[0])?.num : undefined);
+  const lastPinnedChannel = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    // Count each displayed pin (including restored / full-view pins), not layout changes or effect replays.
+    if (pinnedChannel === lastPinnedChannel.current) return;
+    lastPinnedChannel.current = pinnedChannel;
+    if (pinnedChannel !== undefined) track("channel_pinned", { channel: pinnedChannel });
+  }, [pinnedChannel]);
   const mode = useStore((s) => s.mode);
   const lang = useStore((s) => s.lang);
   const theater = useStore((s) => s.theater);
