@@ -94,7 +94,11 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   3000+, 40 numbers each ([live channel] + up to 30 slots, 10 for studio trailers) and use a full page of the channel's
   Videos tab (~30, any age, members-only skipped) merged with its feed. Group flags: `group` (own Topics group),
   `entertainment` → "Hong Kong entertainment" (+ HOY 116), `tech` → "Hong Kong tech", `crime` → "Crime & mystery",
-  `film` → "Movies" (studios filtered to trailers via `replayMatch`). JFFLive is a single live-only channel. All these
+  `film` → "Movies" (studios filtered to trailers via `replayMatch`). JFFLive is a single live-only channel. Shows from a playlist
+  (`playlist: true`, `follow` = playlist id; `episodes: true`) get their own 1000-number bank: 你的保安李寶安 Keep Calm and
+  Call Po On is 5000 (latest episodes looping) + 5000+N = "EP N" (`Channel.episode`, matched by title). `/api/ytlive`
+  reads the whole playlist (continuation pages, cached 5 min); groups list only aired episodes (`setEpisodes` trims the
+  500-slot ceiling once the playlist is read; `useGroupsRev` re-renders lists). All these
   groups sit in the picker's "YouTube content / YouTube 內容" section. Group "Hong Kong news recordings / 香港新聞重溫", right under "Hong Kong news".
 - Channel list rows for video channels show the state (LIVE / REPLAY / OFF AIR / N/A) via `useListStatus`, which
   never starts polling: on-wall snapshot, else the followed channel's cached lookup, else a 24/7 stream is assumed live.

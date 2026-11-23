@@ -21,7 +21,25 @@ export const GET: APIRoute = async ({ url }) => {
   const conf = CHANNELS.get(ch);
   if (!conf) return new Response("unknown channel", { status: 400 });
   const hit = cache.get(ch);
-  if (hit && Date.now() - hit.at < TTL) return json(hit.body);
+  // A show's playlist only changes a few times a week and takes several requests to read: keep it longer.
+  if (hit && Date.now() - hit.at < (conf.playlist ? 5 * 60_000 : TTL)) return json(hit.body);
+  if (conf.playlist) {
+    // A show's playlist (no live stream): every video in it, newest first, with episode numbers where titles carry them.
+    let recent: Video[] = [];
+    try {
+      const [items, feed] = await Promise.all([playlistVideos(ch), rssVideos(ch, true).catch(() => [] as Video[])]);
+      const dated = new Map(feed.map((v) => [v.id, v.published]));
+      recent = items
+        .map((v) => ({ ...v, published: dated.get(v.id) ?? v.published }))
+        .filter((v) => !v.upcoming && !/#shorts/i.test(v.title))
+        .sort((a, b) => (b.ep ?? 0) - (a.ep ?? 0) || Date.parse(b.published) - Date.parse(a.published));
+    } catch {
+      /* nothing this time */
+    }
+    const body = JSON.stringify({ videoId: null, live: false, title: null, recent });
+    if (recent.length) cache.set(ch, { at: Date.now(), body });
+    return json(body);
+  }
   let videoId: string | null = null;
   let liveTitle: string | null = null;
   let live = false;
@@ -104,7 +122,7 @@ const json = (body: string, maxAge = 60) =>
     },
   });
 
-type Video = { id: string; title: string; published: string; upcoming?: boolean };
+type Video = { id: string; title: string; published: string; upcoming?: boolean; ep?: number };
 
 /** Marks of a scheduled stream / premiere in a list item of a channel page. */
 const UPCOMING = /upcomingEventData|"UPCOMING"|Scheduled for|Premieres? |Waiting for|BADGE_STYLE_TYPE_UPCOMING|"style":"UPCOMING"/;
@@ -144,8 +162,8 @@ function walkItems(o: unknown, visit: (id: string, item: Record<string, any>) =>
 }
 
 /** The channel's official feed: its latest 15 uploads (videos and past streams; never members-only), exact dates. */
-async function rssVideos(ch: string): Promise<Video[]> {
-  const xml = await (await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${ch}`, { signal: AbortSignal.timeout(8000) })).text();
+async function rssVideos(ch: string, playlist = false): Promise<Video[]> {
+  const xml = await (await fetch(`https://www.youtube.com/feeds/videos.xml?${playlist ? "playlist_id" : "channel_id"}=${ch}`, { signal: AbortSignal.timeout(8000) })).text();
   return [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].flatMap(([, e]) => {
     const id = e.match(/<yt:videoId>([\w-]{11})<\/yt:videoId>/)?.[1];
     const title = e.match(/<title>([\s\S]*?)<\/title>/)?.[1];
@@ -198,4 +216,73 @@ function agoMs(m: RegExpMatchArray | null): number {
   if (!m) return 0;
   const unit = { second: 1e3, minute: 6e4, hour: 36e5, day: 864e5, week: 6048e5, month: 2592e6, year: 31536e6 }[m[2]] ?? 0;
   return Number(m[1]) * unit;
+}
+
+const BROWSER_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36";
+/** A playlist can run to hundreds of videos (100 a page); stop somewhere sane. */
+const PLAYLIST_MAX_PAGES = 10;
+
+/**
+ * Every public video of a playlist, in its order: the first page from the playlist page's ytInitialData, the rest
+ * (100 at a time) through the same continuation request the page makes on scroll. `ep` = the "EP 12" in the title.
+ * Dates are relative there ("3 weeks ago"), so approximate; the caller fills exact ones from the feed (latest 15).
+ */
+async function playlistVideos(list: string): Promise<Video[]> {
+  const html = await (
+    await fetch(`https://www.youtube.com/playlist?list=${list}`, { headers: { "user-agent": BROWSER_UA, "accept-language": "en" }, signal: AbortSignal.timeout(8000) })
+  ).text();
+  const m = html.match(/var ytInitialData = (\{[\s\S]*?\});<\/script>/);
+  if (!m) return [];
+  const key = html.match(/"INNERTUBE_API_KEY":"([^"]+)"/)?.[1];
+  const version = html.match(/"INNERTUBE_CLIENT_VERSION":"([^"]+)"/)?.[1] ?? "2.20250101.00.00";
+  const out: Video[] = [];
+  const seen = new Set<string>();
+  let token = collectPlaylist(JSON.parse(m[1]), out, seen);
+  for (let page = 1; token && page < PLAYLIST_MAX_PAGES; page++) {
+    const res = await fetch(`https://www.youtube.com/youtubei/v1/browse?prettyPrint=false${key ? `&key=${key}` : ""}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "user-agent": BROWSER_UA, "accept-language": "en" },
+      body: JSON.stringify({ context: { client: { clientName: "WEB", clientVersion: version, hl: "en" } }, continuation: token }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) break;
+    const before = out.length;
+    token = collectPlaylist(await res.json(), out, seen);
+    if (out.length === before) break;
+  }
+  return out;
+}
+
+/** Adds the playlist items found in `data` to `out`; returns the continuation token for the next page, if any. */
+function collectPlaylist(data: unknown, out: Video[], seen: Set<string>): string | undefined {
+  let token: string | undefined;
+  const walk = (o: unknown): void => {
+    if (Array.isArray(o)) return o.forEach(walk);
+    if (!o || typeof o !== "object") return;
+    const r = o as Record<string, any>;
+    const cont = r.continuationItemViewModel ?? r.continuationItemRenderer;
+    if (cont) {
+      const s = JSON.stringify(cont).match(/"token":"([^"]+)"/);
+      if (s) token = s[1];
+      return;
+    }
+    const lockup = r.lockupViewModel;
+    const pv = r.playlistVideoRenderer;
+    if (lockup?.contentId || pv?.videoId) {
+      const s = JSON.stringify(lockup ?? pv);
+      const id: string = lockup?.contentId ?? pv.videoId;
+      const title: string = lockup?.metadata?.lockupMetadataViewModel?.title?.content ?? (pv?.title?.runs ?? []).map((x: { text: string }) => x.text).join("");
+      // Private / deleted entries have no title; members-only ones can't play here.
+      if (id && title && !seen.has(id) && !/MEMBERS_ONLY|Members only|members-only/i.test(s) && !/^\[(Private|Deleted) video\]$/.test(title)) {
+        seen.add(id);
+        const ago = s.match(/(\d+) (second|minute|hour|day|week|month|year)s? ago/);
+        const ep = title.match(/\bEP\.?\s*(\d+)/i)?.[1];
+        out.push({ id, title, published: new Date(Date.now() - agoMs(ago)).toISOString(), upcoming: UPCOMING.test(s), ep: ep ? Number(ep) : undefined });
+      }
+      return;
+    }
+    Object.values(r).forEach(walk);
+  };
+  walk(data);
+  return token;
 }

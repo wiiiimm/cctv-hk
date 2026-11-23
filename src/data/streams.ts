@@ -286,14 +286,14 @@ export const SPACE_STREAMS: SpaceStream[] = [
 ];
 
 /** Channels we follow (allow-list for /api/ytlive), with their replay title filter. */
-export function followedChannels(): { id: string; replayMatch?: string; replayExclude?: string; liveOnly?: boolean; replayDays?: number }[] {
-  const out: { id: string; replayMatch?: string; replayExclude?: string; liveOnly?: boolean; replayDays?: number }[] = [...LIVE_STREAMS, ...NEWS_STREAMS].flatMap((s) =>
+export function followedChannels(): { id: string; replayMatch?: string; replayExclude?: string; liveOnly?: boolean; replayDays?: number; playlist?: boolean }[] {
+  const out: { id: string; replayMatch?: string; replayExclude?: string; liveOnly?: boolean; replayDays?: number; playlist?: boolean }[] = [...LIVE_STREAMS, ...NEWS_STREAMS].flatMap((s) =>
     s.follow
       ? [{ id: s.follow, replayMatch: s.replayMatch, replayExclude: "replayExclude" in s ? (s.replayExclude as string | undefined) : undefined, liveOnly: s.liveOnly }]
       : [],
   );
   for (const r of RECORDING_SOURCES)
-    if (!out.some((o) => o.id === r.follow)) out.push({ id: r.follow, replayMatch: r.replayMatch, replayExclude: undefined, liveOnly: r.liveOnly, replayDays: r.replayDays });
+    if (!out.some((o) => o.id === r.follow)) out.push({ id: r.follow, replayMatch: r.replayMatch, replayExclude: undefined, liveOnly: r.liveOnly, replayDays: r.replayDays, playlist: r.playlist });
   return out;
 }
 
@@ -331,6 +331,16 @@ export interface RecordingSource {
   crime?: boolean;
   /** Part of "Movies" (film releases and trailers). */
   film?: boolean;
+  /**
+   * `follow` is a playlist id (a show), not a channel: every video in it, newest first. With `live`, the channel at
+   * `base` plays the latest episodes on a loop ("latest", never live).
+   */
+  playlist?: boolean;
+  /**
+   * Slots are episodes: base + N is "EP N" (from the title), not the Nth most recent. Groups list only the episodes
+   * released so far (`slots` is the ceiling); videos without an episode number play only on the "latest" channel.
+   */
+  episodes?: boolean;
   lat?: number;
   lon?: number;
 }
@@ -383,6 +393,9 @@ export const RECORDING_SOURCES: RecordingSource[] = [
   { base: 3960, slug: "20thcentury", follow: "UC2-BeLxzUBSs0uSrmzWhJuQ", name: "20th Century trailer", nameZh: "20世紀影業 預告", slots: 10, replayDays: 0, replayMatch: "official trailer|teaser|final trailer|預告", film: true },
   { base: 4000, slug: "warnerbros", follow: "UCjmJDM5pRKbUlVIzDYYWb6g", name: "Warner Bros. trailer", nameZh: "華納兄弟 預告", slots: 10, replayDays: 0, replayMatch: "official trailer|teaser|final trailer|預告", film: true },
   { base: 3720, slug: "onecool", follow: "UCwwlkw15zKcqPeUHvgdteNw", name: "One Cool Film", nameZh: "天下一電影", slots: 30, replayDays: 0, film: true },
+  // 你的保安李寶安 Keep Calm and Call Po On (HOY sitcom, ~4 episodes a week): its own bank, 5000 = latest episodes
+  // looping, 5000 + N = EP N, from the show's playlist (all of it, not just the channel's last page).
+  { base: 5000, slug: "pobon", follow: "PLHMQXZ6Vuqp4", name: "Keep Calm and Call Po On", nameZh: "你的保安李寶安", slots: 500, replayDays: 0, live: true, playlist: true, episodes: true, entertainment: true, group: { id: "pobon", label: "Keep Calm and Call Po On", labelZh: "你的保安李寶安" }, lat: 22.3712, lon: 114.1123 },
   // JFFLive: near-daily live streams — just one live-only channel in Hong Kong entertainment; no group, no slots.
   { base: 3120, slug: "jfflive", follow: "UC3aipgNToMvs2pFaQyaM_hg", name: "JFFLive", nameZh: "JFFLive", slots: 0, live: true, liveOnly: true, entertainment: true },
 ];

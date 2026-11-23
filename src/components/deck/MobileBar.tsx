@@ -1,4 +1,4 @@
-import { CHANNEL_BY_KEY, GROUP_BY_ID, fmtNum } from "../../lib/channels";
+import { CHANNEL_BY_KEY, GROUP_BY_ID, fmtNum, useGroupsRev } from "../../lib/channels";
 import { actions, activeKey, groupKeysOf, useStore } from "../../lib/store";
 import { chName, groupLabel, useT } from "../../lib/i18n";
 import { IconButton, PinToggle } from "../PinButtons";
@@ -18,6 +18,7 @@ export function MobileBar() {
   const ch = key ? CHANNEL_BY_KEY.get(key) : undefined;
   const fav = !!key && s.favourites.includes(key);
 
+  useGroupsRev();
   const keys = groupKeysOf(s);
   const n = Math.max(1, s.cells.length - (s.pinned ? 1 : 0));
   const pages = Math.max(1, Math.ceil(keys.length / n));

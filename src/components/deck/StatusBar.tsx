@@ -1,10 +1,11 @@
-import { CHANNELS, fmtNum, GROUP_BY_ID } from "../../lib/channels";
+import { CHANNELS, fmtNum, GROUP_BY_ID, useGroupsRev } from "../../lib/channels";
 import { groupKeysOf, useStore } from "../../lib/store";
 import { groupLabel, useT } from "../../lib/i18n";
 
 export function StatusBar() {
   const s = useStore((x) => x);
   const t = useT();
+  useGroupsRev();
   const keys = groupKeysOf(s);
   const n = Math.max(1, s.cells.length - (s.pinned ? 1 : 0));
   const pages = Math.max(1, Math.ceil(keys.length / n));

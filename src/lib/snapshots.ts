@@ -2,7 +2,7 @@
 // one poller per key fetches the picture as a blob so the DOM can show an object URL and the CRT
 // renderer can upload an ImageBitmap to WebGL without tainting the canvas.
 import { useEffect, useSyncExternalStore } from "react";
-import { CHANNEL_BY_KEY, gibsTime, snapshotUrl, type Channel } from "./channels";
+import { CHANNEL_BY_KEY, EPISODE_FOLLOWS, gibsTime, setEpisodes, snapshotUrl, type Channel } from "./channels";
 import { store } from "./store";
 import { jmaPicture } from "./satellite";
 
@@ -120,15 +120,16 @@ async function load(key: string) {
       let vid = ch.code;
       if (ch.follow && ch.recIndex !== undefined) {
         // Recording slot: the channel's Nth most recent recording (the same news / last-48h list as its replays).
-        const r = (await (await fetch(`/api/ytlive?ch=${encodeURIComponent(ch.follow)}`)).json()) as { recent?: { id: string; title: string; published: string }[] };
-        const item = r.recent?.[ch.recIndex];
+        const r = (await (await fetch(`/api/ytlive?ch=${encodeURIComponent(ch.follow)}`)).json()) as { recent?: RecentVideo[] };
+        if (ch.episode && r.recent) setEpisodes(ch.follow, episodesOf(r.recent));
+        const item = recItem(ch, r.recent);
         if (!item) {
           set(key, { live: false, replay: false, status: "offline", reason: "offair", videoId: undefined, title: undefined });
         } else {
           if (item.id !== e.snap.videoId) set(key, { url: undefined, bitmap: undefined });
           const ok = await embeddable(item.id);
           await fetchInto(key, `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`).catch(() => {});
-          set(key, { live: ok, replay: true, videoId: item.id, playlist: undefined, title: item.title, takenAt: Date.parse(item.published), status: ok ? "ok" : "offline", reason: ok ? undefined : "blocked" });
+          set(key, { live: ok, replay: true, videoId: item.id, playlist: undefined, title: item.title, takenAt: item.published ? Date.parse(item.published) : undefined, status: ok ? "ok" : "offline", reason: ok ? undefined : "blocked" });
         }
         const still = entries.get(key);
         if (still && still.refs > 0) still.timer = setTimeout(() => load(key), next);
@@ -272,6 +273,15 @@ function subscribe(key: string, cb: () => void) {
   return () => e.listeners.delete(cb);
 }
 
+type RecentVideo = { id: string; title: string; published?: string; ep?: number };
+
+/** The video a recording slot plays: the Nth most recent, or for an episode slot the video titled with its number. */
+function recItem(ch: Channel, recent: RecentVideo[] | undefined): RecentVideo | undefined {
+  if (!recent || ch.recIndex === undefined) return undefined;
+  return ch.episode ? recent.find((v) => v.ep === ch.episode) : recent[ch.recIndex];
+}
+const episodesOf = (recent: RecentVideo[]) => recent.flatMap((v) => (v.ep ? [v.ep] : []));
+
 // ---- Status for lists (channel guide): never starts polling a channel by itself ----
 
 /** Followed channels' live / replay state from /api/ytlive (server-cached), shared by every row that asks. */
@@ -282,7 +292,7 @@ interface FollowState {
   /** The live video (if live) and the replay list (videos with titles), for list rows' links. */
   liveId?: string;
   liveTitle?: string;
-  recent: { id: string; title: string }[];
+  recent: RecentVideo[];
   at: number;
 }
 const followState = new Map<string, FollowState>();
@@ -296,9 +306,10 @@ async function refreshFollow(channelId: string) {
       live: boolean;
       videoId?: string | null;
       title?: string | null;
-      recent?: { id: string; title: string }[];
+      recent?: RecentVideo[];
     };
     const recent = r.recent ?? [];
+    if (EPISODE_FOLLOWS.includes(channelId)) setEpisodes(channelId, episodesOf(recent));
     followState.set(channelId, {
       live: !!r.live,
       replay: !r.live && !!recent.length,
@@ -338,7 +349,7 @@ export function useListVideo(ch: Channel): { id: string; title?: string } | unde
   );
   if (!ch.follow) return undefined;
   if (ch.recIndex !== undefined) {
-    const item = follow?.recent[ch.recIndex];
+    const item = recItem(ch, follow?.recent);
     if (snap.videoId && snap.title) return { id: snap.videoId, title: snap.title };
     return item ? { id: item.id, title: item.title } : undefined;
   }
@@ -377,7 +388,7 @@ export function useListStatus(ch: Channel): ListStatus {
     if (snap.live) return snap.replay ? "replay" : "live";
     return snap.reason === "blocked" ? "blocked" : "offair";
   }
-  if (ch.follow && ch.recIndex !== undefined) return follow ? (ch.recIndex < follow.count ? "replay" : "offair") : "unknown";
+  if (ch.follow && ch.recIndex !== undefined) return follow ? (recItem(ch, follow.recent) ? "replay" : "offair") : "unknown";
   if (ch.follow) return follow ? (follow.live ? "live" : follow.replay ? "replay" : "offair") : "unknown";
   return "live";
 }
@@ -420,3 +431,6 @@ async function mostlyBlack(blob: Blob): Promise<boolean> {
   for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 60) lit++;
   return lit < 64 * 36 * 0.15;
 }
+
+// Shows numbered by episode: read their playlists once at start so groups list only the episodes released so far.
+if (typeof window !== "undefined") EPISODE_FOLLOWS.forEach((id) => refreshFollow(id));

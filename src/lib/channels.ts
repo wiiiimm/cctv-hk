@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import tdCameras from "../data/td-cameras.json";
 import { HKO_STATIONS } from "../data/hko-stations";
 import { DATA_FEEDS, type JmaTiles } from "../data/live-data";
@@ -23,6 +24,8 @@ export interface Channel {
   follow?: string;
   /** Recording slot: play the followed channel's Nth (0-based) most recent recording rather than its live stream. */
   recIndex?: number;
+  /** Episode slot (a show's playlist): plays the video titled "EP <episode>" instead of the Nth most recent. */
+  episode?: number;
   /** Owner blocks playback on other sites: show the still + "YouTube ↗", never a player. */
   noEmbed?: boolean;
   /** Direct image URL overriding the kind's usual one ({lang} → tc / en), e.g. TD speed-map panels. */
@@ -56,8 +59,8 @@ function build(): Channel[] {
         kind: "yt",
         code: `rec-${r.slug}-live`,
         follow: r.follow, // a followed channel: live when on air, else its latest videos
-        name: `${r.name} live`,
-        nameZh: `${r.nameZh} 直播`,
+        name: r.playlist ? `${r.name} · latest` : `${r.name} live`,
+        nameZh: r.playlist ? `${r.nameZh} 最新` : `${r.nameZh} 直播`,
         region: r.group ? r.group.label : r.film ? "Movies" : r.crime ? "Crime & mystery" : r.tech ? "Tech" : r.entertainment ? "Entertainment" : "Recorded",
         regionZh: r.group ? r.group.labelZh : r.film ? "電影" : r.crime ? "罪案及懸疑" : r.tech ? "科技" : r.entertainment ? "娛樂" : "重溫",
         district: r.name,
@@ -72,10 +75,12 @@ function build(): Channel[] {
         code: `rec-${r.slug}-${k + 1}`,
         follow: r.follow,
         recIndex: k,
+        episode: r.episodes ? k + 1 : undefined,
         noEmbed: r.noEmbed,
-        // News: "RTHK News recording 3 / 香港電台新聞 重溫 3"; a channel group: "Mill MILK video 3 / Mill MILK 影片 3".
-        name: r.group || r.tech || r.entertainment || r.crime || r.film ? `${r.name} ${k + 1}` : `${r.name} recording ${k + 1}`,
-        nameZh: r.group || r.tech || r.entertainment || r.crime || r.film ? `${r.nameZh} ${k + 1}` : `${r.nameZh} 重溫 ${k + 1}`,
+        // News: "RTHK News recording 3 / 香港電台新聞 重溫 3"; a channel group: "Mill MILK video 3 / Mill MILK 影片 3";
+        // a show: "Keep Calm and Call Po On EP3 / 你的保安李寶安 第3集".
+        name: r.episodes ? `${r.name} EP${k + 1}` : r.group || r.tech || r.entertainment || r.crime || r.film ? `${r.name} ${k + 1}` : `${r.name} recording ${k + 1}`,
+        nameZh: r.episodes ? `${r.nameZh} 第${k + 1}集` : r.group || r.tech || r.entertainment || r.crime || r.film ? `${r.nameZh} ${k + 1}` : `${r.nameZh} 重溫 ${k + 1}`,
         // News recordings share the "Recorded" region (their group); a source with its own group uses its name.
         region: r.group ? r.group.label : r.film ? "Movies" : r.crime ? "Crime & mystery" : r.tech ? "Tech" : r.entertainment ? "Entertainment" : "Recorded",
         regionZh: r.group ? r.group.labelZh : r.film ? "電影" : r.crime ? "罪案及懸疑" : r.tech ? "科技" : r.entertainment ? "娛樂" : "重溫",
@@ -452,6 +457,43 @@ function buildGroups(): ChannelGroup[] {
 
 export const GROUPS: ChannelGroup[] = buildGroups();
 export const GROUP_BY_ID = new Map(GROUPS.map((g) => [g.id, g]));
+
+/**
+ * Episode slots (a show's playlist) go up to a ceiling far beyond what has aired: groups list only the episodes that
+ * exist. Until the playlist has been read every slot stays listed; `setEpisodes` (from the lookup) trims them.
+ */
+const fullKeys = new Map(GROUPS.map((g) => [g.id, g.keys]));
+const airedEpisodes = new Map<string, Set<number>>();
+const groupListeners = new Set<() => void>();
+export const EPISODE_FOLLOWS = [...new Set(CHANNELS.filter((c) => c.episode).map((c) => c.follow!))];
+
+export function setEpisodes(follow: string, episodes: number[]) {
+  const prev = airedEpisodes.get(follow);
+  const next = new Set(episodes);
+  if (prev && prev.size === next.size && [...next].every((e) => prev.has(e))) return;
+  airedEpisodes.set(follow, next);
+  for (const g of GROUPS) {
+    g.keys = fullKeys.get(g.id)!.filter((k) => {
+      const c = CHANNEL_BY_KEY.get(k);
+      const aired = c?.episode ? airedEpisodes.get(c.follow!) : undefined;
+      return !aired || aired.has(c!.episode!);
+    });
+  }
+  groupRev++;
+  groupListeners.forEach((l) => l());
+}
+let groupRev = 0;
+/** Bumps when group membership changes (episodes released): re-render lists that show group keys / counts. */
+export function useGroupsRev(): number {
+  return useSyncExternalStore(
+    (cb) => {
+      groupListeners.add(cb);
+      return () => groupListeners.delete(cb);
+    },
+    () => groupRev,
+    () => groupRev,
+  );
+}
 
 /** NASA GIBS publishes Himawari every 10 minutes, ~40 minutes behind (a slot is now and then missing): the slot
  * `back` steps (of 10 minutes) before the newest one it usually has. */

@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import { CHANNELS, CHANNEL_BY_KEY, GROUPS, fmtNum, type Channel } from "../../lib/channels";
+import { CHANNELS, CHANNEL_BY_KEY, GROUPS, fmtNum, useGroupsRev, type Channel } from "../../lib/channels";
 import { fuzzySearch } from "../../lib/search";
 import { actionTarget, actions, chooseNearby, groupKeysOf, refreshLocation, store, useStore } from "../../lib/store";
 import { NEARBY_MAX, distanceM, fmtDistance } from "../../lib/geo";
@@ -42,11 +42,12 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
   const query = useDeferredValue(q.trim().toLowerCase());
 
   // Every channel matching the group / search; the list shows the first 400, the map shows them all.
+  const groupsRev = useGroupsRev();
   const matches = useMemo(() => {
     // Searching looks across every channel (fuzzy, best match first); otherwise show the group in order.
     if (query) return fuzzySearch(CHANNELS, query);
     return groupKeysOf({ groupId, favourites, customGroups, here }).map((k) => CHANNEL_BY_KEY.get(k)!);
-  }, [query, groupId, favourites, customGroups, here]);
+  }, [query, groupId, favourites, customGroups, here, groupsRev]);
   const rows = useMemo(() => matches.slice(0, 400), [matches]);
 
   const other = (lang === "zh" ? "en" : "zh") as Lang;
