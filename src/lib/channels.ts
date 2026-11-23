@@ -43,6 +43,8 @@ export interface ChannelGroup {
   /** Where it is listed in the group picker. */
   section: "type" | "topic" | "news" | "youtube" | "region" | "district" | "custom";
   keys: string[];
+  /** Listed indented under the group before it (e.g. a show under "Hong Kong entertainment"). */
+  sub?: boolean;
 }
 
 const REGION_ORDER = ["Hong Kong Island", "Kowloon", "New Territories"];
@@ -373,6 +375,15 @@ function newsGroups(): ChannelGroup[] {
 
 function buildGroups(): ChannelGroup[] {
   const keysOf = (list: Channel[]) => list.map((c) => c.key);
+  // A recording source's own group (e.g. Mill MILK); entertainment ones sit under "Hong Kong entertainment".
+  const ownGroup = (r: (typeof RECORDING_SOURCES)[number]): ChannelGroup => ({
+    id: r.group!.id,
+    section: "youtube",
+    label: r.group!.label,
+    labelZh: r.group!.labelZh,
+    keys: CHANNELS.filter((c) => c.code.startsWith(`rec-${r.slug}-`)).map((c) => c.key),
+    sub: !!r.entertainment,
+  });
   const groups: ChannelGroup[] = [
     { id: "featured", section: "type", label: "Featured", labelZh: "精選", keys: featured() },
     { id: "all", section: "type", label: "All channels", labelZh: "所有頻道", keys: keysOf(CHANNELS) },
@@ -394,6 +405,7 @@ function buildGroups(): ChannelGroup[] {
         ...RECORDING_SOURCES.filter((r) => r.entertainment).flatMap((r) => CHANNELS.filter((c) => c.code.startsWith(`rec-${r.slug}-`)).map((c) => c.key)),
       ].filter((k) => CHANNEL_BY_KEY.has(k)),
     },
+    ...RECORDING_SOURCES.filter((r) => r.group && r.entertainment).map(ownGroup),
     // Hong Kong tech reviewers' latest videos.
     {
       id: "hk-tech",
@@ -418,14 +430,8 @@ function buildGroups(): ChannelGroup[] {
       labelZh: "電影",
       keys: RECORDING_SOURCES.filter((r) => r.film).flatMap((r) => CHANNELS.filter((c) => c.code.startsWith(`rec-${r.slug}-`)).map((c) => c.key)),
     },
-    // Recording sources with their own group (e.g. Mill MILK), listed with the topics.
-    ...RECORDING_SOURCES.filter((r) => r.group).map((r) => ({
-      id: r.group!.id,
-      section: "youtube" as const,
-      label: r.group!.label,
-      labelZh: r.group!.labelZh,
-      keys: CHANNELS.filter((c) => c.code.startsWith(`rec-${r.slug}-`)).map((c) => c.key),
-    })),
+    // Other recording sources with their own group.
+    ...RECORDING_SOURCES.filter((r) => r.group && !r.entertainment).map(ownGroup),
     { id: "kind:hko", section: "type", label: "Hong Kong weather", labelZh: "香港天氣", keys: keysOf(CHANNELS.filter((c) => c.kind === "hko")) },
     { id: "kind:td", section: "type", label: "Traffic", labelZh: "交通", keys: keysOf(CHANNELS.filter((c) => c.kind === "td")) },
   ];

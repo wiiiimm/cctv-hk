@@ -92,7 +92,7 @@ export function ChannelGuide({ onPick }: { onPick?: () => void }) {
               <optgroup label={t.topics}>{section("topic").map((g) => opt(g))}</optgroup>
               <optgroup label={t.feedTypes}>{section("type").map((g) => opt(g))}</optgroup>
               <optgroup label={t.newsGroups}>{section("news").map((g) => opt(g))}</optgroup>
-              <optgroup label={t.youtubeGroups}>{section("youtube").map((g) => opt(g))}</optgroup>
+              <optgroup label={t.youtubeGroups}>{section("youtube").map((g) => opt(g, g.sub))}</optgroup>
               <optgroup label={t.regions}>
                 {GROUPS.filter((g) => g.section === "region" || g.section === "district").map((g) => opt(g, g.section === "district"))}
               </optgroup>

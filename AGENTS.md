@@ -92,7 +92,7 @@ Astro 7 + React 19 (one `client:only` island), TypeScript strict, deployed to Ve
   a followed channel's Nth most recent recording from the same news / last-48h list (`Channel.recIndex`). Tiles show
   the recording's title (`Snap.title`) and air time; empty slots are OFF AIR. Non-news sources (`replayDays: 0`) live in
   3000+, 40 numbers each ([live channel] + up to 30 slots, 10 for studio trailers) and use a full page of the channel's
-  Videos tab (~30, any age, members-only skipped) merged with its feed. Group flags: `group` (own Topics group),
+  Videos tab (~30, any age, members-only skipped) merged with its feed. Group flags: `group` (own group in the YouTube section; entertainment ones listed indented under "Hong Kong entertainment", `ChannelGroup.sub`),
   `entertainment` → "Hong Kong entertainment" (+ HOY 116), `tech` → "Hong Kong tech", `crime` → "Crime & mystery",
   `film` → "Movies" (studios filtered to trailers via `replayMatch`). JFFLive is a single live-only channel. Shows from a playlist
   (`playlist: true`, `follow` = playlist id; `episodes: true`) get their own 1000-number bank: 你的保安李寶安 Keep Calm and
