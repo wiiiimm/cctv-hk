@@ -395,7 +395,7 @@ export const RECORDING_SOURCES: RecordingSource[] = [
   { base: 3720, slug: "onecool", follow: "UCwwlkw15zKcqPeUHvgdteNw", name: "One Cool Film", nameZh: "天下一電影", slots: 30, replayDays: 0, film: true },
   // 你的保安李寶安 Keep Calm and Call Po On (HOY sitcom, ~4 episodes a week): its own bank, 5000 = latest episodes
   // looping, 5000 + N = EP N, from the show's playlist (all of it, not just the channel's last page).
-  { base: 5000, slug: "pobon", follow: "PLHMQXZ6Vuqp4", name: "Keep Calm and Call Po On", nameZh: "你的保安李寶安", slots: 500, replayDays: 0, live: true, playlist: true, episodes: true, entertainment: true, group: { id: "pobon", label: "Keep Calm and Call Po On", labelZh: "你的保安李寶安" }, lat: 22.3712, lon: 114.1123 },
+  { base: 5000, slug: "pobon", follow: "PLHMQXZ6Vuqp4", name: "Keep Calm and Call Po On", nameZh: "你的保安李寶安", slots: 500, replayDays: 0, live: true, playlist: true, episodes: true, entertainment: true, group: { id: "pobon", label: "Keep Calm and Call Po On", labelZh: "你的保安李寶安" }, lat: 22.37303, lon: 114.17959 },
   // JFFLive: near-daily live streams — just one live-only channel in Hong Kong entertainment; no group, no slots.
   { base: 3120, slug: "jfflive", follow: "UC3aipgNToMvs2pFaQyaM_hg", name: "JFFLive", nameZh: "JFFLive", slots: 0, live: true, liveOnly: true, entertainment: true },
 ];

@@ -67,6 +67,7 @@ function build(): Channel[] {
         regionZh: r.group ? r.group.labelZh : r.film ? "電影" : r.crime ? "罪案及懸疑" : r.tech ? "科技" : r.entertainment ? "娛樂" : "重溫",
         district: r.name,
         districtZh: r.nameZh,
+        geo: r.lat != null && r.lon != null ? { lat: r.lat, lon: r.lon, approx: true } : undefined,
         refreshMs: 0,
       });
     for (let k = 0; k < r.slots; k++)
