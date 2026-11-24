@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CHANNEL_BY_KEY, fmtNum } from "../../lib/channels";
 import { actions, activeKey, useStore } from "../../lib/store";
 import { useT } from "../../lib/i18n";
+import { controlKeepsKey } from "../../hooks/useControls";
 
 /** Physical keys that correspond to a remote button, so keyboard presses light up the remote too. */
 const KEY_TO_BTN: Record<string, string> = {
@@ -34,7 +35,7 @@ export function Remote() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).closest("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (controlKeepsKey(e) || e.metaKey || e.ctrlKey || e.altKey) return;
       const id = /^[0-9]$/.test(e.key) ? e.key : KEY_TO_BTN[e.key];
       if (!id) return;
       setLit(id);

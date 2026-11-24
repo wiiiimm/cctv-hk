@@ -8,6 +8,16 @@ function cyclePreset(dir: number) {
 }
 export { cyclePreset };
 
+/** True when the focused element keeps this key for itself, so it is not a shortcut. */
+export function controlKeepsKey(e: KeyboardEvent): boolean {
+  const t = e.target;
+  if (!(t instanceof Element)) return false;
+  // Text boxes keep every key (typing, caret movement).
+  if (t.closest("textarea, [contenteditable=''], [contenteditable='true'], input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=color])")) return true;
+  // Enter / Space keep their meaning on a focused dropdown / checkbox (open it, tick it).
+  return (e.key === "Enter" || e.key === " ") && !!t.closest("select, input[type=checkbox], input[type=radio]");
+}
+
 /** Keyboard, gamepad and patrol timer: everything that drives the store without a pointer. */
 export function useControls() {
   // Keyboard
@@ -15,13 +25,13 @@ export function useControls() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      // Text boxes keep every key (arrows move the caret there).
-      if (t.closest("textarea, [contenteditable=''], [contenteditable='true'], input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button])")) return;
-      // Arrow keys always pick the channel — never the focused control's own behaviour (the group dropdown, the
-      // preview-size slider, a scrolling list). The control lets go of focus so the next keys go to the wall too.
-      const arrow = e.key.startsWith("Arrow");
-      if (!arrow && t.closest("select, input")) return;
-      if (arrow && t !== document.body && t.closest("select, input, button, a, [tabindex]")) (t as HTMLElement).blur?.();
+      if (controlKeepsKey(e)) return;
+      // Every other shortcut always reaches the wall — never the focused control's own behaviour (the dropdown's
+      // type-ahead / arrows, the preview-size slider, a scrolling list). A focused control lets go of focus once a
+      // shortcut is used, so the next keys go to the wall too.
+      const blurFocused = () => {
+        if (t !== document.body && t.closest("select, input, button, a, [tabindex]")) t.blur?.();
+      };
       const s = store.get();
       const single = s.focused || s.cells.length === 1;
       let handled = true;
@@ -126,9 +136,12 @@ export function useControls() {
           default:
             handled = false;
         }
-      if (handled) e.preventDefault();
+      if (handled) {
+        e.preventDefault();
+        blurFocused();
+      }
     };
-    // Capture phase: runs before any control's own handler, so the arrows' default (change the dropdown / slider,
+    // Capture phase: runs before any control's own handler, so its default (change the dropdown / slider, type-ahead,
     // scroll) can be cancelled.
     window.addEventListener("keydown", onKey, { capture: true });
     return () => {
