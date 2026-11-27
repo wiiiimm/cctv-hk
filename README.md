@@ -112,6 +112,12 @@ npm run data:roads # rebuild the road-segment names (needs: pip install pyogrio 
 
 Architecture notes for contributors are in [AGENTS.md](AGENTS.md).
 
+## Licence
+
+[PolyForm Noncommercial 1.0.0](LICENSE.md): free for personal, research, education, hobby and other
+non-commercial use. Commercial use is not permitted without a separate licence from the author. Camera images,
+weather data, news and videos belong to their sources (see Data sources) and are not covered by this licence.
+
 ---
 
 # 香港監察網 · HK Monitor
@@ -204,3 +210,8 @@ npm run data:roads # 重建道路路段名稱（需要：pip install pyogrio pyp
 ```
 
 給貢獻者的架構說明見 [AGENTS.md](AGENTS.md)。
+
+## 授權
+
+[PolyForm Noncommercial 1.0.0](LICENSE.md)：個人、研究、教育、興趣及其他非商業用途可免費使用。
+未經作者另行授權，不得作商業用途。攝影機影像、天氣數據、新聞及影片屬各來源所有（見「數據來源」），不受本授權涵蓋。
